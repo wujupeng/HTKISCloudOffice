@@ -17,7 +17,7 @@
                                     ┌──────────────────────────────┐
                                     │  Windows Server (192.168.2.88)│
                                     │  RDSH + WPS Office            │
-                                    │  域: cii  用户: 10000         │
+                                    │  域: cii  用户: (见 credentials.env)    │
                                     └──────────────────────────────┘
 ```
 
@@ -96,13 +96,13 @@ sudo systemctl restart smbd nmbd
 3. **安装 WPS Office**：通过远程桌面在服务器上安装
 4. **映射共享驱动器**（可选）：
    ```
-   net use Z: \\192.168.2.102\public /user:debian 9090 /persistent:yes
+   net use Z: \\192.168.2.102\public /user:debian <密码> /persistent:yes
    ```
 
 ### 5. 验证
 
 1. 安卓平板 Chrome 打开 `http://192.168.2.102:8080/guacamole`
-2. 用户名: `tablet`, 密码: `Tablet@2026`
+2. 用户名和密码见 `credentials.env` 文件
 3. 点击 **Htkis-Cloud** 连接
 4. 验证远程桌面、文件传输功能
 
@@ -127,12 +127,28 @@ src/                            # .NET 8 源代码 (Alpha 阶段)
 
 ## 用户账户
 
-| 用途 | 用户名 | 密码 |
-|------|--------|------|
-| Guacamole 平板登录 | tablet | Tablet@2026 |
-| Guacamole 管理员 | guacadmin | guacadmin |
-| RDP 远程桌面 | cii\10000 | 123456 |
-| Samba 文件共享 | debian | 9090 |
+凭据存储在 `credentials.env` 文件中（不纳入版本控制），格式如下：
+
+```env
+# Guacamole 平板登录
+GUAC_TABLET_USER=tablet
+GUAC_TABLET_PASS=
+
+# Guacamole 管理员
+GUAC_ADMIN_USER=guacadmin
+GUAC_ADMIN_PASS=
+
+# RDP 远程桌面
+RDP_DOMAIN=cii
+RDP_USER=
+RDP_PASS=
+
+# Samba 文件共享
+SAMBA_USER=debian
+SAMBA_PASS=
+```
+
+首次部署时请复制 `credentials.env.example` 并填入实际密码。
 
 ## 关键配置说明
 

@@ -35,3 +35,5 @@ packages/
 
 # Secrets
 appsettings.production.json
+credentials.env
+deploy/guacamole/user-mapping.xml

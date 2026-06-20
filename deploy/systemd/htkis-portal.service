@@ -1,0 +1,15 @@
+[Unit]
+Description=HTKIS Cloud Office Portal
+After=network.target postgresql.service
+
+[Service]
+Type=notify
+WorkingDirectory=/opt/htkis-cloud-office/portal
+ExecStart=/opt/htkis-cloud-office/portal/HTKISCloudOffice.Server
+Restart=always
+RestartSec=5
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5000
+
+[Install]
+WantedBy=multi-user.target

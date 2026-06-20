@@ -1,0 +1,26 @@
+services:
+  guacd:
+    image: guacamole/guacd:latest
+    container_name: guacd
+    restart: always
+    network_mode: host
+    environment:
+      GUACD_LOG_LEVEL: debug
+    volumes:
+      - /data/shares/public:/drive
+
+  guacamole:
+    image: guacamole/guacamole:latest
+    container_name: guacamole
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      GUACD_HOSTNAME: 192.168.2.102
+      GUACD_PORT: 4822
+    volumes:
+      - ./user-mapping.xml:/etc/guacamole/user-mapping.xml:ro
+
+    depends_on:
+      - guacd
+

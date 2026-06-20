@@ -1,0 +1,46 @@
+<user-mapping>
+    <authorize username="tablet" password="Tablet@2026">
+        <connection name="Htkis-Cloud">
+            <protocol>rdp</protocol>
+            <param name="hostname">192.168.2.88</param>
+            <param name="port">3389</param>
+            <param name="username">cii\10000</param>
+            <param name="password">123456</param>
+            <param name="security-mode">rdp</param>
+            <param name="ignore-cert">true</param>
+            <param name="disable-audio">true</param>
+            <param name="resize-method">display-update</param>
+            <param name="color-depth">24</param>
+            <param name="enable-sftp">true</param>
+            <param name="sftp-hostname">127.0.0.1</param>
+            <param name="sftp-port">22</param>
+            <param name="sftp-username">debian</param>
+            <param name="sftp-password">9090</param>
+            <param name="sftp-root-directory">/data/shares/public</param>
+            <param name="sftp-server-alive-interval">60</param>
+            <param name="sftp-directory-unicode">true</param>
+        </connection>
+    </authorize>
+    <authorize username="guacadmin" password="guacadmin">
+        <connection name="Htkis-Cloud">
+            <protocol>rdp</protocol>
+            <param name="hostname">192.168.2.88</param>
+            <param name="port">3389</param>
+            <param name="username">cii\10000</param>
+            <param name="password">123456</param>
+            <param name="security-mode">rdp</param>
+            <param name="ignore-cert">true</param>
+            <param name="disable-audio">true</param>
+            <param name="resize-method">display-update</param>
+            <param name="color-depth">24</param>
+            <param name="enable-sftp">true</param>
+            <param name="sftp-hostname">127.0.0.1</param>
+            <param name="sftp-port">22</param>
+            <param name="sftp-username">debian</param>
+            <param name="sftp-password">9090</param>
+            <param name="sftp-root-directory">/data/shares/public</param>
+            <param name="sftp-server-alive-interval">60</param>
+            <param name="sftp-directory-unicode">true</param>
+        </connection>
+    </authorize>
+</user-mapping>

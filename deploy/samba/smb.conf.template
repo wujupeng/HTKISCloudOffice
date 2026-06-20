@@ -1,0 +1,14 @@
+[global]
+   workgroup = HTKIS
+   server string = HTKIS Cloud Office File Server
+   security = user
+   map to guest = Bad User
+   dns proxy = no
+
+[public]
+   path = /data/shares/public
+   browseable = yes
+   read only = no
+   valid users = @all_staff
+   create mask = 0660
+   directory mask = 0770

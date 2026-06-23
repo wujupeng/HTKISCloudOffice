@@ -1,13 +1,16 @@
 #!/bin/bash
-# Patch Guacamole title to Htkis-Cloud after container start
+# Patch Guacamole title in WAR file (persistent across restarts, lost on container recreate)
 sleep 10
-EN_JSON=$(docker exec guacamole find /tmp -name 'en.json' -path '*/translations/*' 2>/dev/null | head -1)
-if [ -n "$EN_JSON" ]; then
-    docker exec guacamole sed -i 's/Apache Guacamole/Htkis-Cloud/g' "$EN_JSON"
-    for f in $(docker exec guacamole find /tmp -name '*.json' -path '*/translations/*' 2>/dev/null); do
-        docker exec guacamole sed -i 's/Apache Guacamole/Htkis-Cloud/g' "$f"
-    done
-    echo "Title patched to Htkis-Cloud"
-else
-    echo "Translation file not found"
-fi
+docker exec -u root guacamole bash -c '
+cd /opt/guacamole/webapp
+for lang in en zh; do
+    mkdir -p translations
+    jar xf guacamole.war translations/${lang}.json
+    perl -i -pe "s/Apache Guacamole/Htkis-Cloud/g" translations/${lang}.json
+    jar uf guacamole.war translations/${lang}.json
+    rm -rf translations
+done
+'
+# Restart to reload patched WAR
+docker restart guacamole
+echo "Title patched to Htkis-Cloud (container restarted)"

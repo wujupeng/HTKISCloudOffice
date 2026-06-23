@@ -1,0 +1,22 @@
+[global]
+   workgroup = {{SAMBA_WORKGROUP}}
+   server string = HTKIS Cloud Office File Server
+   security = user
+   map to guest = Bad User
+   dns proxy = no
+   server signing = mandatory
+   ntlm auth = yes
+   server min protocol = SMB3
+   client min protocol = SMB2
+   log level = 3
+   log file = /var/log/samba/log.%m
+   max log size = 50
+
+[public]
+   path = {{SAMBA_SHARE_PATH}}
+   browseable = yes
+   read only = no
+   guest ok = yes
+   force user = debian
+   create mask = 0660
+   directory mask = 0770

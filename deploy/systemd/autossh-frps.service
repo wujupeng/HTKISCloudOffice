@@ -1,0 +1,14 @@
+[Unit]
+Description=AutoSSH tunnel to frps on 8.210.239.214
+After=network.target
+
+[Service]
+Type=simple
+User=debian
+Environment="AUTOSSH_GATETIME=0"
+ExecStart=/usr/bin/autossh -M 0 -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -N -L 7001:127.0.0.1:7001 -p 6000 debian@8.210.239.214
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

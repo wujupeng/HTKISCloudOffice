@@ -28,7 +28,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      GUACD_HOSTNAME: ${LAN_HOST}
+      GUACD_HOSTNAME: {{LAN_HOST}}
       GUACD_PORT: 4822
       POSTGRESQL_HOSTNAME: postgres
       POSTGRESQL_PORT: 5432

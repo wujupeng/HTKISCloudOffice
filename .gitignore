@@ -36,4 +36,23 @@ packages/
 # Secrets
 appsettings.production.json
 credentials.env
+config.env
 deploy/guacamole/user-mapping.xml
+
+# Actual config files (use templates/ instead)
+deploy/frp/frpc.toml
+deploy/frp/frps-htkis.toml
+deploy/frp/frps.toml
+deploy/frp/frpc.ini
+deploy/frp/frps-htkis.service
+
+# Test scripts
+deploy/test_*.sh
+deploy/test_*.py
+deploy/create_test_doc.py
+deploy/guacamole/install-vnc-ssh.sh
+deploy/guacamole/patch-en.py
+
+# Offline build output
+htkis-cloud-office-*-offline/
+htkis-cloud-office-*-offline.tar.gz

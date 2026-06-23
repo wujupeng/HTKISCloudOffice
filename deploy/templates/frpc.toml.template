@@ -1,0 +1,12 @@
+serverAddr = "{{WAN_HOST}}"
+serverPort = {{FRPS_PORT}}
+
+auth.method = "token"
+auth.token = "{{FRP_TOKEN}}"
+
+[[proxies]]
+name = "{{CUSTOMER_NAME}}-guacamole"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = {{GUAC_PORT}}
+remotePort = {{FRP_REMOTE_PORT}}

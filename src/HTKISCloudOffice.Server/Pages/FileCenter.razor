@@ -1,0 +1,128 @@
+@page "/file-center"
+@using HTKISCloudOffice.Application.DTOs
+@using HTKISCloudOffice.Domain.Enums
+@attribute [Authorize]
+
+<div class="file-center-page">
+    <h2 class="page-title">文件中心</h2>
+
+    <div class="file-center-layout">
+        <div class="sidebar">
+            <h3>目录</h3>
+            @foreach (var drive in Drives)
+            {
+                <div class="drive-item @(SelectedDriveId == drive.drive_id ? "active" : "")" @onclick="() => SelectDrive(drive)">
+                    <span class="drive-name">@drive.drive_name</span>
+                </div>
+            }
+        </div>
+
+        <div class="main-content">
+            @if (!string.IsNullOrEmpty(SelectedDriveId))
+            {
+                <div class="breadcrumb">
+                    <span>当前路径: @CurrentPath</span>
+                </div>
+
+                <div class="file-list">
+                    @foreach (var file in Files)
+                    {
+                        <div class="file-item" @onclick="() => HandleFileClick(file)">
+                            <span class="file-name">@(file.is_directory ? "[DIR] " : "")@file.name</span>
+                            <span class="file-size">@(file.is_directory ? "" : FormatSize(file.size))</span>
+                            <span class="file-date">@file.last_modified.ToString("yyyy-MM-dd HH:mm")</span>
+                            @if (!file.is_directory)
+                            {
+                                <button class="btn-sm" @onclick:stopPropagation @onclick="() => DeleteFile(file)">删除</button>
+                            }
+                        </div>
+                    }
+                    @if (Files.Count == 0)
+                    {
+                        <p class="empty-message">此目录为空</p>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="select-drive">请选择左侧目录</p>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<FileDriveDto> Drives { get; set; } = new();
+    private List<FileItemDto> Files { get; set; } = new();
+    private string SelectedDriveId { get; set; } = "";
+    private string CurrentPath { get; set; } = "/";
+
+    [Inject] private HttpClient Http { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<ApiResponse<List<FileDriveDto>>>("/api/v1/file-center/drives");
+            if (response?.success == true && response.data != null)
+            {
+                Drives = response.data;
+            }
+        }
+        catch { }
+    }
+
+    private async Task SelectDrive(FileDriveDto drive)
+    {
+        SelectedDriveId = drive.drive_id;
+        CurrentPath = "/";
+        await LoadFiles();
+    }
+
+    private async Task LoadFiles()
+    {
+        try
+        {
+            var url = "/api/v1/file-center/drives/" + SelectedDriveId + "/files?path=" + Uri.EscapeDataString(CurrentPath);
+            var response = await Http.GetFromJsonAsync<ApiResponse<FileListResult>>(url);
+            if (response?.success == true && response.data != null)
+            {
+                Files = response.data.files;
+            }
+        }
+        catch { }
+    }
+
+    private async Task HandleFileClick(FileItemDto file)
+    {
+        if (file.is_directory)
+        {
+            CurrentPath = string.IsNullOrEmpty(CurrentPath) || CurrentPath == "/"
+                ? "/" + file.name
+                : CurrentPath + "/" + file.name;
+            await LoadFiles();
+        }
+    }
+
+    private async Task DeleteFile(FileItemDto file)
+    {
+        try
+        {
+            var path = string.IsNullOrEmpty(CurrentPath) || CurrentPath == "/"
+                ? "/" + file.name
+                : CurrentPath + "/" + file.name;
+            var url = "/api/v1/file-center/drives/" + SelectedDriveId + "/files?file_path=" + Uri.EscapeDataString(path);
+            await Http.DeleteAsync(url);
+            await LoadFiles();
+        }
+        catch { }
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024.0).ToString("F1") + " KB";
+        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024.0 * 1024)).ToString("F1") + " MB";
+        return (bytes / (1024.0 * 1024 * 1024)).ToString("F1") + " GB";
+    }
+}

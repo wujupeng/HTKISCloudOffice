@@ -27,6 +27,7 @@ packages/
 *.dll
 *.pdb
 *.cache
+*.log
 
 # CodeArts
 .arts/
@@ -38,6 +39,7 @@ appsettings.production.json
 credentials.env
 config.env
 deploy/guacamole/user-mapping.xml
+deploy/systemd/autossh-frps.service
 
 # Actual config files (use templates/ instead)
 deploy/frp/frpc.toml
@@ -56,3 +58,6 @@ deploy/guacamole/patch-en.py
 # Offline build output
 htkis-cloud-office-*-offline/
 htkis-cloud-office-*-offline.tar.gz
+
+# Temp files
+tmp-*/

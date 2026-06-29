@@ -1,0 +1,60 @@
+services:
+  app-postgres:
+    image: postgres:15
+    container_name: htkis_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: htkis_cloud
+      POSTGRES_USER: htkis
+      POSTGRES_PASSWORD: ${HTKIS_DB_PASSWORD}
+    volumes:
+      - htkis_pgdata:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d
+    ports:
+      - "5433:5432"
+
+  nginx-proxy:
+    image: nginx:alpine
+    container_name: htkis-nginx
+    restart: always
+    network_mode: host
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+
+  email-auth:
+    build:
+      context: ../services/email-auth
+      dockerfile: Dockerfile
+    container_name: htkis-email-auth
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://htkis:${HTKIS_DB_PASSWORD}@127.0.0.1:5433/htkis_cloud
+      - GUACAMOLE_URL=http://127.0.0.1:8081/guacamole
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM=${SMTP_FROM}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRE_DAYS=30
+      - ADMIN_USERNAMES=guacadmin
+    network_mode: host
+
+  screenshot-service:
+    build:
+      context: ../services/screenshot
+      dockerfile: Dockerfile
+    container_name: htkis-screenshot
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://htkis:${HTKIS_DB_PASSWORD}@127.0.0.1:5433/htkis_cloud
+      - SCREENSHOT_DIR=/mnt/share/HCOffice
+      - JWT_SECRET=${JWT_SECRET}
+      - ADMIN_USERNAMES=guacadmin
+    volumes:
+      - /mnt/share/HCOffice:/mnt/share/HCOffice:ro
+    network_mode: host
+
+volumes:
+  htkis_pgdata:

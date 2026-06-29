@@ -1,0 +1,92 @@
+@page "/portal"
+@using HTKISCloudOffice.Application.DTOs
+@using HTKISCloudOffice.Domain.Enums
+@attribute [Authorize]
+
+<div class="portal-page">
+    <h2 class="page-title">HTKIS Cloud Office</h2>
+
+    @foreach (var group in AppGroups)
+    {
+        <section class="app-section">
+            <h3 class="section-title">@GetCategoryName(group.Key)</h3>
+            <div class="app-grid">
+                @foreach (var app in group)
+                {
+                    <div class="app-card" @onclick="() => LaunchApp(app)">
+                        <div class="app-icon">
+                            <img src="@app.icon_url" alt="@app.app_name" onerror="this.style.display='none'" />
+                            <span class="icon-fallback">@GetAppIcon(app.app_type)</span>
+                        </div>
+                        <div class="app-name">@app.app_name</div>
+                    </div>
+                }
+            </div>
+        </section>
+    }
+</div>
+
+@code {
+    private List<ApplicationDto> Applications { get; set; } = new();
+    private IEnumerable<IGrouping<AppCategory, ApplicationDto>> AppGroups => Applications.GroupBy(a => a.category);
+
+    [Inject] private HttpClient Http { get; set; } = null!;
+    [Inject] private NavigationManager Nav { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<ApiResponse<AppListResponse>>("/api/v1/applications");
+            if (response?.success == true && response.data != null)
+            {
+                Applications = response.data.applications;
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task LaunchApp(ApplicationDto app)
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"/api/v1/applications/{app.app_id}/launch", new { });
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<LaunchResult>>();
+                if (result?.success == true && result.data != null)
+                {
+                    if (app.app_type == AppType.CloudDesktop || app.app_type == AppType.FileManager)
+                    {
+                        Nav.NavigateTo($"/desktop?connection_id={result.data.connection_id}");
+                    }
+                    else if (app.app_type == AppType.WebLink)
+                    {
+                        Nav.NavigateTo(result.data.guacamole_url, forceLoad: true);
+                    }
+                }
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private static string GetCategoryName(AppCategory category) => category switch
+    {
+        AppCategory.Office => "办公应用",
+        AppCategory.Business => "业务系统",
+        AppCategory.File => "文件管理",
+        _ => "其他"
+    };
+
+    private static string GetAppIcon(AppType type) => type switch
+    {
+        AppType.CloudDesktop => "&#128187;",
+        AppType.WebLink => "&#127760;",
+        AppType.FileManager => "&#128193;",
+        _ => "&#128196;"
+    };
+}

@@ -1,0 +1,321 @@
+@page "/admin/connections"
+@using HTKISCloudOffice.Application.DTOs
+@using HTKISCloudOffice.Domain.Enums
+@using Microsoft.AspNetCore.Components.Authorization
+
+<div class="admin-connection-page">
+    <div class="page-header">
+        <h2>连接配置管理</h2>
+        <button class="btn-create" @onclick="ShowCreateForm">新建连接</button>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="loading">加载中...</div>
+    }
+    else if (Configs.Any())
+    {
+        <table class="connection-table">
+            <thead>
+                <tr>
+                    <th>名称</th>
+                    <th>协议</th>
+                    <th>主机</th>
+                    <th>端口</th>
+                    <th>RemoteApp</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var config in Configs)
+                {
+                    <tr>
+                        <td>@config.connection_name</td>
+                        <td><span class="protocol-badge protocol-@config.protocol.ToString().ToLower()">@config.protocol</span></td>
+                        <td>@config.hostname</td>
+                        <td>@config.port</td>
+                        <td>@(config.is_remote_app ? "是" : "否")</td>
+                        <td>
+                            <span class="status-badge @(config.is_active ? "active" : "inactive")">
+                                @(config.is_active ? "启用" : "禁用")
+                            </span>
+                        </td>
+                        <td>
+                            <button class="btn-edit" @onclick="() => ShowEditForm(config)">编辑</button>
+                            <button class="btn-delete" @onclick="() => ConfirmDelete(config)">删除</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="empty-state">暂无连接配置</div>
+    }
+</div>
+
+@if (ShowForm)
+{
+    <div class="form-overlay">
+        <div class="form-card">
+            <h3>@(IsEditing ? "编辑连接" : "新建连接")</h3>
+            <div class="form-group">
+                <label>连接名称</label>
+                <input type="text" @bind="FormData.connection_name" />
+            </div>
+            <div class="form-group">
+                <label>协议</label>
+                <select @bind="FormData.protocol" @bind:event="onchange" @bind:after="OnProtocolChanged">
+                    <option value="@ConnectionProtocol.RDP">RDP</option>
+                    <option value="@ConnectionProtocol.VNC">VNC</option>
+                    <option value="@ConnectionProtocol.SSH">SSH</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>主机</label>
+                <input type="text" @bind="FormData.hostname" />
+            </div>
+            <div class="form-group">
+                <label>端口</label>
+                <input type="number" @bind="FormData.port" />
+            </div>
+            <div class="form-group">
+                <label>用户名</label>
+                <input type="text" @bind="FormData.username" />
+            </div>
+            <div class="form-group">
+                <label>密码</label>
+                <input type="password" @bind="FormData.password" />
+            </div>
+
+            @if (FormData.protocol == ConnectionProtocol.RDP)
+            {
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" @bind="FormData.is_remote_app" />
+                        启用 RemoteApp
+                    </label>
+                </div>
+                @if (FormData.is_remote_app)
+                {
+                    <div class="form-group">
+                        <label>程序路径</label>
+                        <input type="text" @bind="FormData.remote_app_path" />
+                    </div>
+                }
+            }
+
+            @if (FormData.protocol == ConnectionProtocol.VNC)
+            {
+                <div class="form-group">
+                    <label>色彩深度</label>
+                    <select @bind="VncColorDepth">
+                        <option value="8">8位</option>
+                        <option value="16">16位</option>
+                        <option value="24">24位</option>
+                        <option value="32">32位</option>
+                    </select>
+                </div>
+            }
+
+            @if (FormData.protocol == ConnectionProtocol.SSH)
+            {
+                <div class="form-group">
+                    <label>字体名称</label>
+                    <input type="text" @bind="SshFontName" />
+                </div>
+                <div class="form-group">
+                    <label>字体大小</label>
+                    <input type="number" @bind="SshFontSize" />
+                </div>
+            }
+
+            <div class="form-actions">
+                <button class="btn-save" @onclick="SaveForm">保存</button>
+                <button class="btn-cancel" @onclick="HideForm">取消</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (ShowDeleteConfirm)
+{
+    <div class="confirm-overlay">
+        <div class="confirm-card">
+            <h3>确认删除</h3>
+            <p>确定要删除连接 "@DeleteTarget?.connection_name" 吗？删除后已建立的会话不受影响。</p>
+            <div class="confirm-actions">
+                <button class="btn-confirm" @onclick="ExecuteDelete">确认删除</button>
+                <button class="btn-cancel" @onclick="CancelDelete">取消</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ConnectionConfigDto> Configs { get; set; } = new();
+    private bool IsLoading { get; set; }
+    private bool ShowForm { get; set; }
+    private bool IsEditing { get; set; }
+    private Guid EditingId { get; set; }
+    private bool ShowDeleteConfirm { get; set; }
+    private ConnectionConfigDto? DeleteTarget { get; set; }
+
+    private CreateConnectionConfigRequest FormData { get; set; } = new();
+    private int VncColorDepth { get; set; } = 24;
+    private string SshFontName { get; set; } = "monospace";
+    private int SshFontSize { get; set; } = 12;
+
+    [Inject] private HttpClient Http { get; set; } = null!;
+    [Inject] private NavigationManager Nav { get; set; } = null!;
+    [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthState;
+        if (!state.User.IsInRole("super_admin"))
+        {
+            Nav.NavigateTo("/portal", forceLoad: true);
+            return;
+        }
+
+        await LoadConfigs();
+    }
+
+    private async Task LoadConfigs()
+    {
+        IsLoading = true;
+        try
+        {
+            var response = await Http.GetAsync("/api/v1/admin/connections");
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<List<ConnectionConfigDto>>>();
+                if (result?.data != null)
+                    Configs = result.data;
+            }
+        }
+        catch
+        {
+            Configs = new();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void ShowCreateForm()
+    {
+        IsEditing = false;
+        EditingId = Guid.Empty;
+        FormData = new CreateConnectionConfigRequest
+        {
+            protocol = ConnectionProtocol.RDP,
+            port = 3389
+        };
+        ShowForm = true;
+    }
+
+    private void ShowEditForm(ConnectionConfigDto config)
+    {
+        IsEditing = true;
+        EditingId = config.connection_id;
+        FormData = new CreateConnectionConfigRequest
+        {
+            connection_name = config.connection_name,
+            protocol = config.protocol,
+            hostname = config.hostname,
+            port = config.port,
+            username = config.username,
+            is_remote_app = config.is_remote_app,
+            remote_app_path = config.remote_app_path,
+            allowed_role_ids = config.allowed_role_ids
+        };
+        ShowForm = true;
+    }
+
+    private void HideForm()
+    {
+        ShowForm = false;
+    }
+
+    private async Task OnProtocolChanged()
+    {
+        FormData.port = FormData.protocol switch
+        {
+            ConnectionProtocol.RDP => 3389,
+            ConnectionProtocol.VNC => 5900,
+            ConnectionProtocol.SSH => 22,
+            _ => 3389
+        };
+        FormData.is_remote_app = false;
+        await Task.CompletedTask;
+    }
+
+    private async Task SaveForm()
+    {
+        try
+        {
+            if (IsEditing)
+            {
+                var updateRequest = new UpdateConnectionConfigRequest
+                {
+                    connection_name = FormData.connection_name,
+                    protocol = FormData.protocol,
+                    hostname = FormData.hostname,
+                    port = FormData.port,
+                    username = FormData.username,
+                    password = FormData.password,
+                    is_remote_app = FormData.is_remote_app,
+                    remote_app_path = FormData.remote_app_path,
+                    allowed_role_ids = FormData.allowed_role_ids
+                };
+
+                await Http.PutAsJsonAsync($"/api/v1/admin/connections/{EditingId}", updateRequest);
+            }
+            else
+            {
+                await Http.PostAsJsonAsync("/api/v1/admin/connections", FormData);
+            }
+
+            ShowForm = false;
+            await LoadConfigs();
+        }
+        catch
+        {
+        }
+    }
+
+    private void ConfirmDelete(ConnectionConfigDto config)
+    {
+        DeleteTarget = config;
+        ShowDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        ShowDeleteConfirm = false;
+        DeleteTarget = null;
+    }
+
+    private async Task ExecuteDelete()
+    {
+        if (DeleteTarget == null) return;
+
+        try
+        {
+            await Http.DeleteAsync($"/api/v1/admin/connections/{DeleteTarget.connection_id}");
+            ShowDeleteConfirm = false;
+            DeleteTarget = null;
+            await LoadConfigs();
+        }
+        catch
+        {
+            ShowDeleteConfirm = false;
+            DeleteTarget = null;
+        }
+    }
+}

@@ -1,0 +1,28 @@
+<div class="device-bind-prompt-overlay">
+    <div class="device-bind-prompt-card">
+        <h3>绑定设备</h3>
+        <p>是否绑定此设备以启用自动登录？绑定后下次访问可自动登录，无需输入用户名密码。</p>
+        <p class="device-info">设备：@DeviceName</p>
+        <div class="prompt-actions">
+            <button class="btn-confirm" @onclick="ConfirmBind">绑定设备</button>
+            <button class="btn-cancel" @onclick="Dismiss">暂不绑定</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string DeviceId { get; set; } = "";
+    [Parameter] public string DeviceName { get; set; } = "";
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnDismiss { get; set; }
+
+    private async Task ConfirmBind()
+    {
+        await OnConfirm.InvokeAsync();
+    }
+
+    private async Task Dismiss()
+    {
+        await OnDismiss.InvokeAsync();
+    }
+}

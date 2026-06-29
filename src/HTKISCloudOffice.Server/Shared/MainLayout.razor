@@ -1,0 +1,122 @@
+@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
+@implements IAsyncDisposable
+
+<div class="main-layout">
+    <header class="top-nav">
+        <div class="nav-brand">
+            <span class="brand-icon">&#9729;</span>
+            <span class="brand-text">HTKIS Cloud</span>
+        </div>
+        <div class="nav-user">
+            <span class="user-name">@UserName</span>
+            <button class="btn-logout" @onclick="Logout">退出</button>
+        </div>
+    </header>
+
+    @if (ShowTokenExpiringWarning)
+    {
+        <div class="alert alert-warning token-warning">
+            <span>会话即将过期，请重新登录</span>
+            <button class="btn-dismiss" @onclick="DismissWarning">知道了</button>
+        </div>
+    }
+
+    <div class="content-wrapper">
+        <nav class="sidebar">
+            <NavLink href="" Match="NavLinkMatch.All" class="nav-item">
+                <span class="nav-icon">&#127968;</span>
+                <span class="nav-label">首页</span>
+            </NavLink>
+            <NavLink href="desktop" class="nav-item">
+                <span class="nav-icon">&#128187;</span>
+                <span class="nav-label">云桌面</span>
+            </NavLink>
+            <NavLink href="connections" class="nav-item">
+                <span class="nav-icon">&#127760;</span>
+                <span class="nav-label">连接管理</span>
+            </NavLink>
+            @if (IsAdmin)
+            {
+                <NavLink href="admin/users" class="nav-item">
+                    <span class="nav-icon">&#9881;</span>
+                    <span class="nav-label">管理</span>
+                </NavLink>
+                <NavLink href="admin/devices" class="nav-item">
+                    <span class="nav-icon">&#128241;</span>
+                    <span class="nav-label">设备管理</span>
+                </NavLink>
+                <NavLink href="admin/connections" class="nav-item">
+                    <span class="nav-icon">&#128279;</span>
+                    <span class="nav-label">连接配置</span>
+                </NavLink>
+            }
+        </nav>
+
+        <main class="main-content">
+            @Body
+        </main>
+    </div>
+</div>
+
+<script>
+    window.tokenExpiringHandler = {
+        callback: null,
+        register: function(callback) {
+            window.tokenExpiringHandler.callback = callback;
+        },
+        notify: function(message) {
+            if (window.tokenExpiringHandler.callback) {
+                window.tokenExpiringHandler.callback(message);
+            }
+        }
+    };
+</script>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; } = null!;
+
+    private string UserName { get; set; } = "";
+    private bool IsAdmin { get; set; }
+    private bool ShowTokenExpiringWarning { get; set; }
+
+    [Inject] private NavigationManager Nav { get; set; } = null!;
+    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthState;
+        var user = state.User;
+        UserName = user.Identity?.Name ?? "用户";
+        IsAdmin = user.IsInRole("super_admin");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("tokenExpiringHandler.register", new Action<string>(OnTokenExpiring));
+        }
+    }
+
+    private void OnTokenExpiring(string message)
+    {
+        ShowTokenExpiringWarning = true;
+        StateHasChanged();
+    }
+
+    private void DismissWarning()
+    {
+        ShowTokenExpiringWarning = false;
+    }
+
+    private void Logout()
+    {
+        Nav.NavigateTo("/api/v1/auth/logout", forceLoad: true);
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        return ValueTask.CompletedTask;
+    }
+}

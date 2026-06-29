@@ -1,0 +1,194 @@
+@page "/admin/devices"
+@using HTKISCloudOffice.Application.DTOs
+@using Microsoft.AspNetCore.Components.Authorization
+
+<div class="admin-device-page">
+    <div class="page-header">
+        <h2>设备绑定管理</h2>
+    </div>
+
+    <div class="filter-bar">
+        <div class="filter-group">
+            <label>用户ID</label>
+            <input type="text" @bind="FilterUserId" placeholder="输入用户ID" />
+        </div>
+        <div class="filter-group">
+            <label>状态</label>
+            <select @bind="FilterIsActive">
+                <option value="">全部</option>
+                <option value="true">活跃</option>
+                <option value="false">已解绑</option>
+            </select>
+        </div>
+        <button class="btn-filter" @onclick="LoadDevices">查询</button>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="loading">加载中...</div>
+    }
+    else if (Devices.Any())
+    {
+        <table class="device-table">
+            <thead>
+                <tr>
+                    <th>设备名</th>
+                    <th>绑定用户</th>
+                    <th>绑定时间</th>
+                    <th>最后登录</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var device in Devices)
+                {
+                    <tr>
+                        <td>@device.device_name</td>
+                        <td>@(device.display_name ?? device.username ?? device.user_id.ToString())</td>
+                        <td>@device.created_at.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@(device.last_login_at?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "-")</td>
+                        <td>
+                            <span class="status-badge @(device.is_active ? "active" : "inactive")">
+                                @(device.is_active ? "活跃" : "已解绑")
+                            </span>
+                        </td>
+                        <td>
+                            @if (device.is_active)
+                            {
+                                <button class="btn-unbind" @onclick="() => ConfirmUnbind(device)">解绑</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="pagination">
+            <span>共 @TotalCount 条记录</span>
+            <button class="btn-page" disabled="@(CurrentPage <= 1)" @onclick="() => GoToPage(CurrentPage - 1)">上一页</button>
+            <span>第 @CurrentPage / @TotalPages 页</span>
+            <button class="btn-page" disabled="@(CurrentPage >= TotalPages)" @onclick="() => GoToPage(CurrentPage + 1)">下一页</button>
+        </div>
+    }
+    else
+    {
+        <div class="empty-state">暂无设备绑定记录</div>
+    }
+</div>
+
+@if (ShowUnbindConfirm)
+{
+    <div class="confirm-overlay">
+        <div class="confirm-card">
+            <h3>确认解绑</h3>
+            <p>确定要解绑设备 "@UnbindTarget?.device_name" 吗？解绑后该设备的自动登录将失效。</p>
+            <div class="confirm-actions">
+                <button class="btn-confirm" @onclick="ExecuteUnbind">确认解绑</button>
+                <button class="btn-cancel" @onclick="CancelUnbind">取消</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<DeviceBindingDto> Devices { get; set; } = new();
+    private bool IsLoading { get; set; }
+    private int CurrentPage { get; set; } = 1;
+    private int TotalCount { get; set; }
+    private int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
+    private const int PageSize = 20;
+
+    private string FilterUserId { get; set; } = "";
+    private string? FilterIsActive { get; set; }
+
+    private bool ShowUnbindConfirm { get; set; }
+    private DeviceBindingDto? UnbindTarget { get; set; }
+
+    [Inject] private HttpClient Http { get; set; } = null!;
+    [Inject] private NavigationManager Nav { get; set; } = null!;
+    [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthState;
+        if (!state.User.IsInRole("super_admin"))
+        {
+            Nav.NavigateTo("/portal", forceLoad: true);
+            return;
+        }
+
+        await LoadDevices();
+    }
+
+    private async Task LoadDevices()
+    {
+        IsLoading = true;
+        try
+        {
+            var query = $"?page={CurrentPage}&page_size={PageSize}";
+            if (Guid.TryParse(FilterUserId, out var uid))
+                query += $"&user_id={uid}";
+            if (!string.IsNullOrEmpty(FilterIsActive) && bool.TryParse(FilterIsActive, out var active))
+                query += $"&is_active={active}";
+
+            var response = await Http.GetAsync($"/api/v1/admin/devices{query}");
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<PagedResult<DeviceBindingDto>>>();
+                if (result?.data != null)
+                {
+                    Devices = result.data.items;
+                    TotalCount = result.data.total;
+                }
+            }
+        }
+        catch
+        {
+            Devices = new();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task GoToPage(int page)
+    {
+        CurrentPage = page;
+        await LoadDevices();
+    }
+
+    private void ConfirmUnbind(DeviceBindingDto device)
+    {
+        UnbindTarget = device;
+        ShowUnbindConfirm = true;
+    }
+
+    private void CancelUnbind()
+    {
+        ShowUnbindConfirm = false;
+        UnbindTarget = null;
+    }
+
+    private async Task ExecuteUnbind()
+    {
+        if (UnbindTarget == null) return;
+
+        try
+        {
+            var response = await Http.DeleteAsync($"/api/v1/admin/devices/{UnbindTarget.binding_id}");
+            if (response.IsSuccessStatusCode)
+            {
+                ShowUnbindConfirm = false;
+                UnbindTarget = null;
+                await LoadDevices();
+            }
+        }
+        catch
+        {
+            ShowUnbindConfirm = false;
+            UnbindTarget = null;
+        }
+    }
+}

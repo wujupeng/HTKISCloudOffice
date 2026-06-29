@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>HTKIS 云办公 - 登录</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:linear-gradient(135deg,#1a237e 0%,#0d47a1 50%,#01579b 100%);min-height:100vh;display:flex;align-items:center;justify-content:center}
+.login-card{background:#fff;border-radius:12px;padding:40px;width:380px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.login-card h1{text-align:center;color:#1a237e;font-size:22px;margin-bottom:8px}
+.login-card .subtitle{text-align:center;color:#666;font-size:14px;margin-bottom:28px}
+.form-group{margin-bottom:18px}
+.form-group label{display:block;color:#333;font-size:14px;font-weight:500;margin-bottom:6px}
+.form-group input{width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:15px;transition:border-color .2s}
+.form-group input:focus{outline:none;border-color:#1a237e}
+.btn{width:100%;padding:13px;background:#1a237e;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;transition:background .2s}
+.btn:hover{background:#0d47a1}
+.btn:disabled{background:#999;cursor:not-allowed}
+.error-msg{color:#d32f2f;font-size:13px;margin-top:6px;display:none}
+.code-section{display:none}
+.code-input-group{display:flex;gap:8px}
+.code-input-group input{flex:1}
+.code-input-group button{padding:12px 16px;background:#e8eaf6;color:#1a237e;border:none;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap}
+.code-input-group button:disabled{color:#999}
+.resend-timer{font-size:12px;color:#999;margin-top:4px}
+.email-hint{font-size:13px;color:#666;margin-bottom:12px}
+</style>
+</head>
+<body>
+<div class="login-card">
+<h1>HTKIS 云办公</h1>
+<p class="subtitle">企业轻终端云办公平台</p>
+
+<div id="login-section">
+<div class="form-group">
+<label>用户名</label>
+<input type="text" id="username" autocomplete="username">
+</div>
+<div class="form-group">
+<label>密码</label>
+<input type="password" id="password" autocomplete="current-password">
+</div>
+<div id="login-error" class="error-msg"></div>
+<button class="btn" id="login-btn" onclick="doLogin()">登 录</button>
+</div>
+
+<div id="code-section" class="code-section">
+<p class="email-hint">验证码已发送到 <strong id="email-mask"></strong></p>
+<div class="form-group">
+<label>验证码</label>
+<div class="code-input-group">
+<input type="text" id="code" maxlength="6" inputmode="numeric" pattern="[0-9]*">
+<button id="resend-btn" onclick="doResend()">重新发送</button>
+</div>
+<div id="resend-timer" class="resend-timer"></div>
+</div>
+<div id="code-error" class="error-msg"></div>
+<button class="btn" id="verify-btn" onclick="doVerify()">验 证</button>
+</div>
+</div>
+
+<script>
+let currentUsername='';
+let resendCountdown=0;
+let resendInterval=null;
+
+document.getElementById('password').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()});
+document.getElementById('code').addEventListener('keydown',function(e){if(e.key==='Enter')doVerify()});
+
+async function doLogin(){
+const u=document.getElementById('username').value.trim();
+const p=document.getElementById('password').value;
+if(!u||!p)return;
+document.getElementById('login-btn').disabled=true;
+document.getElementById('login-error').style.display='none';
+try{
+const r=await fetch('/api/email-auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+const d=await r.json();
+if(d.success){
+if(d.require_email_code){
+currentUsername=u;
+document.getElementById('email-mask').textContent=d.email_mask;
+document.getElementById('login-section').style.display='none';
+document.getElementById('code-section').style.display='block';
+document.getElementById('code').focus();
+startResendCountdown(60);
+}else{
+window.location.href=d.redirect||'/guacamole/';
+}
+}else{
+document.getElementById('login-error').textContent=d.message;
+document.getElementById('login-error').style.display='block';
+}
+}catch(e){
+document.getElementById('login-error').textContent='网络错误，请重试';
+document.getElementById('login-error').style.display='block';
+}finally{
+document.getElementById('login-btn').disabled=false;
+}
+}
+
+async function doVerify(){
+const c=document.getElementById('code').value.trim();
+if(!c)return;
+document.getElementById('verify-btn').disabled=true;
+document.getElementById('code-error').style.display='none';
+try{
+const r=await fetch('/api/email-auth/verify-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:currentUsername,code:c})});
+const d=await r.json();
+if(d.success){
+window.location.href=d.redirect||'/guacamole/';
+}else{
+document.getElementById('code-error').textContent=d.message;
+document.getElementById('code-error').style.display='block';
+}
+}catch(e){
+document.getElementById('code-error').textContent='网络错误，请重试';
+document.getElementById('code-error').style.display='block';
+}finally{
+document.getElementById('verify-btn').disabled=false;
+}
+}
+
+async function doResend(){
+if(resendCountdown>0)return;
+document.getElementById('resend-btn').disabled=true;
+try{
+const r=await fetch('/api/email-auth/send-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:currentUsername})});
+const d=await r.json();
+if(d.success){
+startResendCountdown(d.resend_after||60);
+}else{
+document.getElementById('code-error').textContent=d.message;
+document.getElementById('code-error').style.display='block';
+}
+}catch(e){}
+}
+
+function startResendCountdown(sec){
+resendCountdown=sec;
+const btn=document.getElementById('resend-btn');
+const timer=document.getElementById('resend-timer');
+btn.disabled=true;
+if(resendInterval)clearInterval(resendInterval);
+resendInterval=setInterval(()=>{
+resendCountdown--;
+if(resendCountdown<=0){
+clearInterval(resendInterval);
+btn.disabled=false;
+btn.textContent='重新发送';
+timer.textContent='';
+}else{
+btn.textContent=resendCountdown+'s';
+timer.textContent=resendCountdown+'秒后可重新发送';
+}
+},1000);
+}
+</script>
+</body>
+</html>

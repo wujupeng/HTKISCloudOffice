@@ -1,0 +1,169 @@
+@page "/app-center"
+@using HTKISCloudOffice.Application.DTOs
+@using HTKISCloudOffice.Domain.Enums
+@attribute [Authorize]
+
+<div class="app-center-page">
+    <div class="search-bar">
+        <input type="text" placeholder="搜索应用..." @bind="SearchKeyword" @bind:event="oninput" @bind:after="SearchApps" />
+    </div>
+
+    @if (SearchKeyword.Length > 0)
+    {
+        <section class="search-results">
+            <h3 class="section-title">搜索结果</h3>
+            <div class="app-grid">
+                @foreach (var app in SearchResults)
+                {
+                    <div class="app-card" @onclick="() => LaunchApp(app)">
+                        <div class="app-icon">
+                            <img src="@app.icon_url" alt="@app.app_name" onerror="this.style.display='none'" />
+                            <span class="icon-fallback">@GetAppIcon(app.app_type)</span>
+                        </div>
+                        <div class="app-name">@app.app_name</div>
+                    </div>
+                }
+                @if (SearchResults.Count == 0)
+                {
+                    <p class="no-results">未找到匹配的应用</p>
+                }
+            </div>
+        </section>
+    }
+    else
+    {
+        @if (CenterView.favorites.Any())
+        {
+            <section class="favorites-section">
+                <h3 class="section-title">⭐ 我的收藏</h3>
+                <div class="app-grid favorites-grid">
+                    @foreach (var app in CenterView.favorites)
+                    {
+                        <div class="app-card favorited" @onclick="() => LaunchApp(app)">
+                            <div class="app-icon">
+                                <img src="@app.icon_url" alt="@app.app_name" onerror="this.style.display='none'" />
+                                <span class="icon-fallback">@GetAppIcon(app.app_type)</span>
+                            </div>
+                            <div class="app-name">@app.app_name</div>
+                            <button class="unfavorite-btn" @onclick:stopPropagation @onclick="() => ToggleFavorite(app, true)">★</button>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+
+        @foreach (var cat in CenterView.categories)
+        {
+            <section class="app-section">
+                <h3 class="section-title">@cat.category_name</h3>
+                <div class="app-grid">
+                    @foreach (var app in cat.applications)
+                    {
+                        <div class="app-card" @onclick="() => LaunchApp(app)">
+                            <div class="app-icon">
+                                <img src="@app.icon_url" alt="@app.app_name" onerror="this.style.display='none'" />
+                                <span class="icon-fallback">@GetAppIcon(app.app_type)</span>
+                            </div>
+                            <div class="app-name">@app.app_name</div>
+                            <button class="favorite-btn" @onclick:stopPropagation @onclick="() => ToggleFavorite(app, false)">☆</button>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+    }
+</div>
+
+@code {
+    private AppCenterView CenterView { get; set; } = new();
+    private string SearchKeyword { get; set; } = "";
+    private List<ApplicationDto> SearchResults { get; set; } = new();
+
+    [Inject] private HttpClient Http { get; set; } = null!;
+    [Inject] private NavigationManager Nav { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCenterView();
+    }
+
+    private async Task LoadCenterView()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<ApiResponse<AppCenterView>>("/api/v1/applications/center");
+            if (response?.success == true && response.data != null)
+            {
+                CenterView = response.data;
+            }
+        }
+        catch { }
+    }
+
+    private async Task SearchApps()
+    {
+        if (string.IsNullOrWhiteSpace(SearchKeyword))
+        {
+            SearchResults = new();
+            return;
+        }
+        try
+        {
+            var response = await Http.GetFromJsonAsync<ApiResponse<List<ApplicationDto>>>($"/api/v1/applications/search?q={Uri.EscapeDataString(SearchKeyword)}");
+            if (response?.success == true && response.data != null)
+            {
+                SearchResults = response.data;
+            }
+        }
+        catch { }
+    }
+
+    private async Task ToggleFavorite(ApplicationDto app, bool is_favorited)
+    {
+        try
+        {
+            if (is_favorited)
+            {
+                await Http.DeleteAsync($"/api/v1/applications/{app.app_id}/favorite");
+            }
+            else
+            {
+                await Http.PostAsync($"/api/v1/applications/{app.app_id}/favorite", null);
+            }
+            await LoadCenterView();
+        }
+        catch { }
+    }
+
+    private async Task LaunchApp(ApplicationDto app)
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"/api/v1/applications/{app.app_id}/launch", new { });
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<LaunchResult>>();
+                if (result?.success == true && result.data != null)
+                {
+                    if (app.app_type == AppType.CloudDesktop || app.app_type == AppType.FileManager)
+                    {
+                        Nav.NavigateTo($"/desktop?connection_id={result.data.connection_id}");
+                    }
+                    else if (app.app_type == AppType.WebLink)
+                    {
+                        Nav.NavigateTo(result.data.guacamole_url, forceLoad: true);
+                    }
+                }
+            }
+        }
+        catch { }
+    }
+
+    private static string GetAppIcon(AppType type) => type switch
+    {
+        AppType.CloudDesktop => "&#128187;",
+        AppType.WebLink => "&#127760;",
+        AppType.FileManager => "&#128193;",
+        _ => "&#128196;"
+    };
+}

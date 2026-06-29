@@ -1,0 +1,189 @@
+@page "/connections"
+@attribute [Authorize]
+@using HTKISCloudOffice.Application.DTOs
+@using HTKISCloudOffice.Domain.Enums
+@using Microsoft.AspNetCore.SignalR.Client
+
+<div class="connection-manager-page">
+    <h2>连接管理</h2>
+
+    @if (IsLoading)
+    {
+        <div class="loading">加载中...</div>
+    }
+    else
+    {
+        @if (RdpConnections.Any())
+        {
+            <div class="connection-group">
+                <h3>Windows 云桌面</h3>
+                <div class="connection-grid">
+                    @foreach (var conn in RdpConnections)
+                    {
+                        <ConnectionCard Config="conn" Status="GetStatus(conn.connection_id)"
+                                        OnConnectClicked="ConnectTo" OnDisconnectClicked="DisconnectFrom" />
+                    }
+                </div>
+            </div>
+        }
+
+        @if (VncConnections.Any())
+        {
+            <div class="connection-group">
+                <h3>Linux 桌面</h3>
+                <div class="connection-grid">
+                    @foreach (var conn in VncConnections)
+                    {
+                        <ConnectionCard Config="conn" Status="GetStatus(conn.connection_id)"
+                                        OnConnectClicked="ConnectTo" OnDisconnectClicked="DisconnectFrom" />
+                    }
+                </div>
+            </div>
+        }
+
+        @if (SshConnections.Any())
+        {
+            <div class="connection-group">
+                <h3>终端</h3>
+                <div class="connection-grid">
+                    @foreach (var conn in SshConnections)
+                    {
+                        <ConnectionCard Config="conn" Status="GetStatus(conn.connection_id)"
+                                        OnConnectClicked="ConnectTo" OnDisconnectClicked="DisconnectFrom" />
+                    }
+                </div>
+            </div>
+        }
+
+        @if (!RdpConnections.Any() && !VncConnections.Any() && !SshConnections.Any())
+        {
+            <div class="empty-state">暂无可用的连接</div>
+        }
+    }
+</div>
+
+@code {
+    private List<ConnectionConfigDto> Connections { get; set; } = new();
+    private Dictionary<Guid, string> ConnectionStatuses { get; set; } = new();
+    private bool IsLoading { get; set; } = true;
+    private HubConnection? _hub_connection;
+
+    private List<ConnectionConfigDto> RdpConnections => Connections.Where(c => c.protocol == ConnectionProtocol.RDP).ToList();
+    private List<ConnectionConfigDto> VncConnections => Connections.Where(c => c.protocol == ConnectionProtocol.VNC).ToList();
+    private List<ConnectionConfigDto> SshConnections => Connections.Where(c => c.protocol == ConnectionProtocol.SSH).ToList();
+
+    [Inject] private HttpClient Http { get; set; } = null!;
+    [Inject] private NavigationManager Nav { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadConnections();
+        await SetupSignalR();
+    }
+
+    private async Task LoadConnections()
+    {
+        IsLoading = true;
+        try
+        {
+            var response = await Http.GetAsync("/api/v1/connections");
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<List<ConnectionConfigDto>>>();
+                if (result?.data != null)
+                {
+                    Connections = result.data;
+                    foreach (var conn in Connections)
+                    {
+                        if (!ConnectionStatuses.ContainsKey(conn.connection_id))
+                            ConnectionStatuses[conn.connection_id] = "disconnected";
+                    }
+                }
+            }
+        }
+        catch
+        {
+            Connections = new();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task SetupSignalR()
+    {
+        _hub_connection = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/hubs/desktop"))
+            .Build();
+
+        _hub_connection.On<string, string, string>("ConnectionStatusChanged", (connection_id, status, protocol) =>
+        {
+            var configId = Connections.FirstOrDefault(c => connection_id.Contains(c.connection_id.ToString()))?.connection_id;
+            if (configId.HasValue)
+            {
+                ConnectionStatuses[configId.Value] = status;
+                StateHasChanged();
+            }
+        });
+
+        await _hub_connection.StartAsync();
+    }
+
+    private string GetStatus(Guid connection_id)
+    {
+        return ConnectionStatuses.GetValueOrDefault(connection_id, "disconnected");
+    }
+
+    private async Task ConnectTo(Guid connection_id)
+    {
+        ConnectionStatuses[connection_id] = "connecting";
+        StateHasChanged();
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"/api/v1/connections/{connection_id}/connect", new { });
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<ConnectionConnectResult>>();
+                if (result?.data != null)
+                {
+                    Nav.NavigateTo($"/desktop?connection_id={result.data.connection_id}&protocol={result.data.protocol}");
+                }
+            }
+        }
+        catch
+        {
+            ConnectionStatuses[connection_id] = "error";
+            StateHasChanged();
+        }
+    }
+
+    private async Task DisconnectFrom(Guid connection_id)
+    {
+        var guac_id = "";
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"/api/v1/connections/{connection_id}/disconnect",
+                new { guacamole_connection_id = guac_id });
+            if (response.IsSuccessStatusCode)
+            {
+                ConnectionStatuses[connection_id] = "disconnected";
+                StateHasChanged();
+            }
+        }
+        catch
+        {
+            ConnectionStatuses[connection_id] = "error";
+            StateHasChanged();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hub_connection != null)
+        {
+            await _hub_connection.DisposeAsync();
+        }
+    }
+}

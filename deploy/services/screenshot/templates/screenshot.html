@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HTKIS 云办公 - 截屏管理</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f5f5f5;padding:20px}
+.container{max-width:1200px;margin:0 auto}
+h1{color:#1a237e;font-size:20px;margin-bottom:20px}
+.card{background:#fff;border-radius:8px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.filters{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.filters label{font-size:14px;color:#333}
+.filters input,.filters select{padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px}
+.btn{padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:14px}
+.btn-primary{background:#1a237e;color:#fff}
+.btn-secondary{background:#e8eaf6;color:#1a237e}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.stat-card{background:#e8eaf6;border-radius:8px;padding:12px;text-align:center}
+.stat-card .value{font-size:24px;font-weight:700;color:#1a237e}
+.stat-card .label{font-size:12px;color:#666}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.gallery-item{border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1);cursor:pointer;position:relative}
+.gallery-item img{width:100%;height:120px;object-fit:cover;display:block}
+.gallery-item .time{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:4px 8px}
+.pagination{display:flex;gap:8px;justify-content:center;margin-top:16px}
+.pagination button{padding:6px 12px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer}
+.pagination button.active{background:#1a237e;color:#fff;border-color:#1a237e}
+.modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);z-index:100;cursor:pointer}
+.modal-overlay img{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);max-width:95%;max-height:95%}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>截屏记录管理</h1>
+<div class="stats" id="stats"></div>
+<div class="card">
+<div class="filters">
+<label>用户:</label><select id="user-select"><option value="">选择用户</option></select>
+<label>起始:</label><input type="date" id="date-from">
+<label>结束:</label><input type="date" id="date-to">
+<button class="btn btn-primary" onclick="loadScreenshots()">查询</button>
+<button class="btn btn-secondary" onclick="scanFiles()">扫描新文件</button>
+</div>
+<div class="gallery" id="gallery"></div>
+<div class="pagination" id="pagination"></div>
+</div>
+</div>
+<div class="modal-overlay" id="image-modal" onclick="this.style.display='none'">
+<img id="modal-image">
+</div>
+<script>
+const today=new Date().toISOString().split('T')[0];
+document.getElementById('date-from').value=today;
+document.getElementById('date-to').value=today;
+
+async function loadStats(){
+const r=await fetch('/api/stats');
+const d=await r.json();
+if(!d.success)return;
+const s=d.data;
+document.getElementById('stats').innerHTML=`
+<div class="stat-card"><div class="value">${s.total_files}</div><div class="label">总文件数</div></div>
+<div class="stat-card"><div class="value">${s.total_size_mb}</div><div class="label">总大小(MB)</div></div>
+<div class="stat-card"><div class="value">${s.oldest_date||'-'}</div><div class="label">最早日期</div></div>
+<div class="stat-card"><div class="value">${s.newest_date||'-'}</div><div class="label">最新日期</div></div>
+<div class="stat-card"><div class="value">${s.disk_usage_percent}%</div><div class="label">磁盘使用率</div></div>`;
+const sel=document.getElementById('user-select');
+const current=sel.value;
+sel.innerHTML='<option value="">选择用户</option>'+s.users.map(u=>`<option value="${u.username}">${u.username} (${u.file_count}张, ${u.size_mb}MB)</option>`).join('');
+if(current)sel.value=current;
+}
+
+async function loadScreenshots(page=1){
+const username=document.getElementById('user-select').value;
+const dateFrom=document.getElementById('date-from').value;
+const dateTo=document.getElementById('date-to').value;
+if(!username||!dateFrom||!dateTo)return;
+const r=await fetch(`/api/list?username=${username}&date_from=${dateFrom}&date_to=${dateTo}&page=${page}&page_size=50`);
+const d=await r.json();
+if(!d.success)return;
+const gallery=document.getElementById('gallery');
+if(d.data.records.length===0){gallery.innerHTML='<p style="color:#999;text-align:center;padding:20px">暂无截屏记录</p>';return;}
+gallery.innerHTML=d.data.records.map(r=>{
+const t=r.capture_time?new Date(r.capture_time).toLocaleString():'';
+return `<div class="gallery-item" onclick="showImage('${r.file_path}')">
+<img src="/api/image?path=${encodeURIComponent(r.file_path)}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22120%22><rect fill=%22%23eee%22 width=%22200%22 height=%22120%22/><text x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 fill=%22%23999%22 font-size=%2214%22>加载失败</text></svg>'">
+<div class="time">${t}</div></div>`;
+}).join('');
+
+const total=d.data.total;
+const pages=Math.ceil(total/50);
+const pag=document.getElementById('pagination');
+if(pages<=1){pag.innerHTML='';return;}
+let html='';
+for(let i=1;i<=Math.min(pages,10);i++){
+html+=`<button class="${i===page?'active':''}" onclick="loadScreenshots(${i})">${i}</button>`;
+}
+pag.innerHTML=html;
+}
+
+function showImage(path){
+document.getElementById('modal-image').src='/api/image?path='+encodeURIComponent(path);
+document.getElementById('image-modal').style.display='block';
+}
+
+async function scanFiles(){
+const r=await fetch('/api/scan',{method:'POST'});
+const d=await r.json();
+alert(`扫描完成: 新增 ${d.scanned} 条, 跳过 ${d.skipped} 条`);
+loadStats();
+loadScreenshots();
+}
+
+loadStats();
+</script>
+</body>
+</html>

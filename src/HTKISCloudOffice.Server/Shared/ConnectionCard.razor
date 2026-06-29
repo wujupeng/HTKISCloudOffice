@@ -1,0 +1,68 @@
+@using HTKISCloudOffice.Application.DTOs
+@using HTKISCloudOffice.Domain.Enums
+
+<div class="connection-card">
+    <div class="card-header">
+        <span class="protocol-icon protocol-@ProtocolClass">@ProtocolIcon</span>
+        <span class="connection-name">@Config.connection_name</span>
+        <span class="status-indicator status-@StatusClass"></span>
+    </div>
+    <div class="card-body">
+        <div class="card-info">
+            <span class="info-label">主机:</span>
+            <span class="info-value">@Config.hostname:@Config.port</span>
+        </div>
+        @if (Config.is_remote_app && !string.IsNullOrEmpty(Config.remote_app_path))
+        {
+            <div class="card-info">
+                <span class="info-label">应用:</span>
+                <span class="info-value">@Config.remote_app_path</span>
+            </div>
+        }
+    </div>
+    <div class="card-actions">
+        @if (Status == "connected")
+        {
+            <button class="btn-disconnect" @onclick="OnDisconnect">断开</button>
+        }
+        else
+        {
+            <button class="btn-connect" @onclick="OnConnect" disabled="@(Status == "connecting")">
+                @(Status == "connecting" ? "连接中..." : "连接")
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public ConnectionConfigDto Config { get; set; } = null!;
+    [Parameter] public string Status { get; set; } = "disconnected";
+    [Parameter] public EventCallback<Guid> OnConnectClicked { get; set; }
+    [Parameter] public EventCallback<Guid> OnDisconnectClicked { get; set; }
+
+    private string ProtocolClass => Config.protocol.ToString().ToLower();
+    private string ProtocolIcon => Config.protocol switch
+    {
+        ConnectionProtocol.RDP => "🖥",
+        ConnectionProtocol.VNC => "🐧",
+        ConnectionProtocol.SSH => "⌨",
+        _ => "🖥"
+    };
+    private string StatusClass => Status switch
+    {
+        "connected" => "connected",
+        "connecting" => "connecting",
+        "error" => "error",
+        _ => "disconnected"
+    };
+
+    private async Task OnConnect()
+    {
+        await OnConnectClicked.InvokeAsync(Config.connection_id);
+    }
+
+    private async Task OnDisconnect()
+    {
+        await OnDisconnectClicked.InvokeAsync(Config.connection_id);
+    }
+}

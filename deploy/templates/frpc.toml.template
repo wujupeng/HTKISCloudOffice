@@ -8,5 +8,5 @@ auth.token = "{{FRP_TOKEN}}"
 name = "{{CUSTOMER_NAME}}-guacamole"
 type = "tcp"
 localIP = "127.0.0.1"
-localPort = {{GUAC_PORT}}
+localPort = 8080
 remotePort = {{FRP_REMOTE_PORT}}

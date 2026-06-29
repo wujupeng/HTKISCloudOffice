@@ -1,0 +1,224 @@
+@page "/desktop"
+@attribute [Authorize]
+@using HTKISCloudOffice.Domain.Enums
+@using Microsoft.AspNetCore.SignalR.Client
+
+<div class="desktop-page">
+    @if (IsLoading)
+    {
+        <div class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <p>正在连接云桌面...</p>
+            @if (LoadTime > 8)
+            {
+                <p class="timeout-warning">连接超时，请检查网络或联系管理员</p>
+            }
+        </div>
+    }
+
+    @if (IsDisconnected)
+    {
+        <div class="disconnect-overlay">
+            <p>连接已断开</p>
+            <button class="btn-reconnect" @onclick="Reconnect">重新连接</button>
+            <button class="btn-back" @onclick="GoBack">返回</button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(GuacamoleUrl) && !IsDisconnected)
+    {
+        <div class="desktop-toolbar">
+            <button class="btn-fullscreen" @onclick="ToggleFullscreen">全屏</button>
+            <button class="btn-disconnect" @onclick="Disconnect">断开连接</button>
+            <span class="connection-status @ConnectionStatusClass">@ConnectionStatusText</span>
+            @if (CurrentProtocol != null)
+            {
+                <span class="protocol-badge protocol-@CurrentProtocol.Value.ToString().ToLower()">@CurrentProtocol</span>
+            }
+        </div>
+        <iframe src="@GuacamoleUrl" class="desktop-viewer @(IsRemoteApp ? "remote-app-viewer" : "")" allow="clipboard-read; clipboard-write"></iframe>
+    }
+</div>
+
+@code {
+    private string GuacamoleUrl { get; set; } = "";
+    private bool IsLoading { get; set; } = true;
+    private int LoadTime { get; set; }
+    private string ConnectionStatusText { get; set; } = "连接中";
+    private string ConnectionStatusClass => ConnectionStatusText switch
+    {
+        "已连接" => "status-connected",
+        "连接中" => "status-connecting",
+        _ => "status-disconnected"
+    };
+
+    private string? ConnectionId { get; set; }
+    private ConnectionProtocol? CurrentProtocol { get; set; }
+    private bool IsRemoteApp { get; set; }
+    private bool IsDisconnected { get; set; }
+    private Guid ConnectionConfigId { get; set; }
+    private HubConnection? _hub_connection;
+
+    [Inject] private HttpClient Http { get; set; } = null!;
+    [Inject] private NavigationManager Nav { get; set; } = null!;
+    [Inject] private IJSRuntime JS { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = new Uri(Nav.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        ConnectionId = query.GetValueOrDefault("connection_id", "");
+        var protocolStr = query.GetValueOrDefault("protocol", "");
+        var configIdStr = query.GetValueOrDefault("config_id", "");
+        var remoteAppStr = query.GetValueOrDefault("remote_app", "");
+
+        if (!string.IsNullOrEmpty(protocolStr) && Enum.TryParse<ConnectionProtocol>(protocolStr, out var protocol))
+            CurrentProtocol = protocol;
+
+        if (!string.IsNullOrEmpty(configIdStr) && Guid.TryParse(configIdStr, out var configId))
+            ConnectionConfigId = configId;
+
+        IsRemoteApp = remoteAppStr == "true";
+
+        if (!string.IsNullOrEmpty(ConnectionId))
+        {
+            GuacamoleUrl = $"/guacamole/#/client/{ConnectionId}";
+            IsLoading = false;
+            ConnectionStatusText = "已连接";
+        }
+        else
+        {
+            await ConnectDesktop();
+        }
+
+        await SetupSignalR();
+    }
+
+    private async Task SetupSignalR()
+    {
+        _hub_connection = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/hubs/desktop"))
+            .Build();
+
+        _hub_connection.On<string, string, string>("ConnectionStatusChanged", (connection_id, status, protocol) =>
+        {
+            if (connection_id == ConnectionId)
+            {
+                ConnectionStatusText = status switch
+                {
+                    "connected" => "已连接",
+                    "connecting" => "连接中",
+                    "disconnected" => "已断开",
+                    _ => "错误"
+                };
+
+                if (status == "disconnected")
+                    IsDisconnected = true;
+
+                StateHasChanged();
+            }
+        });
+
+        _hub_connection.On<int>("TokenExpiring", (minutes_remaining) =>
+        {
+            ConnectionStatusText = $"会话即将过期（{minutes_remaining}分钟）";
+            StateHasChanged();
+        });
+
+        await _hub_connection.StartAsync();
+    }
+
+    private async Task ConnectDesktop()
+    {
+        IsLoading = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("/api/v1/desktop/connect", new { app_id = (string?)null });
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResponse<DesktopConnectionResult>>();
+                if (result?.success == true && result.data != null)
+                {
+                    GuacamoleUrl = result.data.guacamole_url;
+                    ConnectionId = result.data.connection_id;
+                    ConnectionStatusText = "已连接";
+                    CurrentProtocol = ConnectionProtocol.RDP;
+                }
+            }
+        }
+        catch
+        {
+            ConnectionStatusText = "连接失败";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task Disconnect()
+    {
+        if (!string.IsNullOrEmpty(ConnectionId))
+        {
+            await Http.PostAsJsonAsync("/api/v1/desktop/disconnect", new { connection_id = ConnectionId });
+        }
+        Nav.NavigateTo("/portal");
+    }
+
+    private async Task Reconnect()
+    {
+        IsDisconnected = false;
+        IsLoading = true;
+        ConnectionStatusText = "连接中";
+        StateHasChanged();
+
+        try
+        {
+            if (ConnectionConfigId != Guid.Empty && !string.IsNullOrEmpty(ConnectionId))
+            {
+                var response = await Http.PostAsJsonAsync($"/api/v1/connections/{ConnectionConfigId}/reconnect",
+                    new { guacamole_connection_id = ConnectionId });
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = await response.Content.ReadFromJsonAsync<ApiResponse<ConnectionConnectResult>>();
+                    if (result?.data != null)
+                    {
+                        ConnectionId = result.data.connection_id;
+                        GuacamoleUrl = result.data.guacamole_url;
+                        ConnectionStatusText = "已连接";
+                        IsLoading = false;
+                        return;
+                    }
+                }
+            }
+
+            Nav.NavigateTo("/connections", forceLoad: true);
+        }
+        catch
+        {
+            ConnectionStatusText = "重连失败";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        Nav.NavigateTo("/connections");
+    }
+
+    private void ToggleFullscreen()
+    {
+        JS.InvokeVoidAsync("document.documentElement.requestFullscreen");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hub_connection != null)
+        {
+            await _hub_connection.DisposeAsync();
+        }
+    }
+}

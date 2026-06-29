@@ -27,4 +27,8 @@ async def auth_check(request: Request):
     exp = payload.get("exp")
     if exp and datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(tz=timezone.utc):
         return Response(status_code=401)
-    return Response(status_code=200)
+    response = Response(status_code=200)
+    guac_token = payload.get("guac_token", "")
+    if guac_token:
+        response.headers["X-Guac-Token"] = guac_token
+    return response

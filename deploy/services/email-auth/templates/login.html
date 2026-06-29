@@ -68,6 +68,19 @@ let resendInterval=null;
 document.getElementById('password').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()});
 document.getElementById('code').addEventListener('keydown',function(e){if(e.key==='Enter')doVerify()});
 
+async function guacLogin(username,password){
+try{
+const body=password?{username:username,password:password}:{username:currentUsername,password:document.getElementById('password').value};
+const r=await fetch('/guacamole/api/tokens',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(body).toString()});
+if(r.ok){
+const d=await r.json();
+if(d.authToken){
+localStorage.setItem('GUAC_AUTH_TOKEN',d.authToken);
+}
+}
+}catch(e){}
+}
+
 async function doLogin(){
 const u=document.getElementById('username').value.trim();
 const p=document.getElementById('password').value;
@@ -86,6 +99,7 @@ document.getElementById('code-section').style.display='block';
 document.getElementById('code').focus();
 startResendCountdown(60);
 }else{
+await guacLogin(u,p);
 window.location.href=d.redirect||'/guacamole/';
 }
 }else{
@@ -109,6 +123,7 @@ try{
 const r=await fetch('/api/email-auth/verify-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:currentUsername,code:c})});
 const d=await r.json();
 if(d.success){
+await guacLogin(currentUsername,null);
 window.location.href=d.redirect||'/guacamole/';
 }else{
 document.getElementById('code-error').textContent=d.message;

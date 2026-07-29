@@ -1,32 +1,24 @@
 services:
-  guacd:
-    image: guacamole/guacd:latest
-    container_name: guacd
-    restart: always
-    network_mode: host
-    environment:
-      GUACD_LOG_LEVEL: debug
-    volumes:
-      - /data/shares/public:/drive
-
   postgres:
     image: postgres:15
-    container_name: guac_postgres
+    container_name: erp-guac-postgres
     restart: always
     environment:
-      POSTGRES_DB: guacamole_db
+      POSTGRES_DB: erp_guacamole_db
       POSTGRES_USER: guacamole
-      POSTGRES_PASSWORD: GuacDb2024!
+      POSTGRES_PASSWORD: ErpDb2026!
     volumes:
-      - guac_pgdata:/var/lib/postgresql/data
+      - erp_pgdata:/var/lib/postgresql/data
       - ./init:/docker-entrypoint-initdb.d
+    ports:
+      - "127.0.0.1:5435:5432"
 
   guacamole:
     image: guacamole/guacamole:latest
-    container_name: guacamole
+    container_name: erp-guacamole
     restart: always
     ports:
-      - "127.0.0.1:8081:8080"
+      - "127.0.0.1:8082:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
@@ -34,15 +26,14 @@ services:
       GUACD_PORT: 4822
       POSTGRESQL_HOSTNAME: postgres
       POSTGRESQL_PORT: 5432
-      POSTGRESQL_DATABASE: guacamole_db
+      POSTGRESQL_DATABASE: erp_guacamole_db
       POSTGRESQL_USER: guacamole
-      POSTGRESQL_PASSWORD: GuacDb2024!
+      POSTGRESQL_PASSWORD: ErpDb2026!
       GUACAMOLE_HOME: /etc/guacamole
     volumes:
       - ./guacamole-home:/etc/guacamole
     depends_on:
-      - guacd
       - postgres
 
 volumes:
-  guac_pgdata:
+  erp_pgdata:

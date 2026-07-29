@@ -1,0 +1,8 @@
+services:
+  guacd:
+    image: guacamole/guacd:latest
+    container_name: guacd
+    restart: always
+    network_mode: host
+    environment:
+      GUACD_LOG_LEVEL: info

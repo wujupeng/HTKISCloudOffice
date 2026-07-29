@@ -5,12 +5,13 @@ import aiosmtplib
 from email.mime.text import MIMEText
 from fastapi import APIRouter, Request, Response, Depends
 from jose import jwt
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import JWT_SECRET, JWT_EXPIRE_DAYS, GUACAMOLE_URL, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM, SMTP_USE_TLS, ADMIN_USERNAMES
 from database import get_db
-from models import UserEmailBinding, EmailVerificationCode, AuthExemptPeriod, VerificationStatus
+from models import UserEmailBinding, EmailVerificationCode, VerificationStatus
+from guacamole_admin import ensure_user_and_grant
 import httpx
 
 
@@ -23,14 +24,14 @@ def create_jwt_token(username: str) -> str:
         "sub": username,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(days=JWT_EXPIRE_DAYS)).timestamp()),
-        "type": "htkis_auth",
+        "type": "erp_auth",
     }
     return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
 
 def set_auth_cookie(response: Response, token: str):
     response.set_cookie(
-        key="htkis_auth_token",
+        key="erp_auth_token",
         value=token,
         max_age=JWT_EXPIRE_DAYS * 86400,
         httponly=True,
@@ -42,7 +43,7 @@ def set_auth_cookie(response: Response, token: str):
 
 def clear_auth_cookie(response: Response):
     response.set_cookie(
-        key="htkis_auth_token",
+        key="erp_auth_token",
         value="",
         max_age=0,
         httponly=True,
@@ -78,15 +79,15 @@ async def verify_guacamole_credentials(username: str, password: str) -> bool:
 
 
 async def send_verification_email(username: str, email_addr: str, code: str):
-    subject = "【HTKIS 云办公】登录验证码"
+    subject = "【ERP 云办公】登录验证码"
     html = f"""
     <html><body>
     <p>尊敬的用户 {username}：</p>
-    <p>您正在登录 HTKIS 云办公平台，验证码为：</p>
+    <p>您正在登录 ERP 云办公平台，验证码为：</p>
     <h2 style="color:#0066cc;letter-spacing:5px;">{code}</h2>
     <p>验证码 5 分钟内有效，请勿泄露给他人。</p>
     <p>如非本人操作，请忽略此邮件。</p>
-    <hr><p style="color:#999;font-size:12px;">— HTKIS 云办公平台</p>
+    <hr><p style="color:#999;font-size:12px;">— ERP 云办公平台</p>
     </body></html>
     """
     msg = MIMEText(html, "html", "utf-8")
@@ -126,7 +127,6 @@ async def login(request: Request, response: Response, db: AsyncSession = Depends
     binding = result.scalar_one_or_none()
     if binding is None:
         return {"success": True, "require_bind_email": True, "message": "请绑定邮箱以完成首次登录验证"}
-
 
     old_codes = await db.execute(
         select(EmailVerificationCode).where(
@@ -322,9 +322,12 @@ async def verify_code(request: Request, response: Response, db: AsyncSession = D
 
     record.status = VerificationStatus.VERIFIED
     record.verified_at = now_naive
-
-
     await db.commit()
+
+    try:
+        await ensure_user_and_grant(username)
+    except Exception as e:
+        print(f"Failed to grant Guacamole permissions for {username}: {e}")
 
     token = create_jwt_token(username)
     set_auth_cookie(response, token)
@@ -334,7 +337,7 @@ async def verify_code(request: Request, response: Response, db: AsyncSession = D
 @router.post("/logout")
 async def logout(response: Response):
     clear_auth_cookie(response)
-    return {"success": True, "redirect": "/api/email-auth/login-page"}
+    return {"success": True, "redirect": "/api/erp-auth/login-page"}
 
 
 @router.get("/login-page")

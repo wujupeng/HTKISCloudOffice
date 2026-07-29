@@ -7,12 +7,12 @@ router = APIRouter()
 
 
 def verify_jwt_from_cookie(request: Request) -> dict | None:
-    token = request.cookies.get("htkis_auth_token")
+    token = request.cookies.get("erp_auth_token")
     if not token:
         return None
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-        if payload.get("type") != "htkis_auth":
+        if payload.get("type") != "erp_auth":
             return None
         return payload
     except JWTError:

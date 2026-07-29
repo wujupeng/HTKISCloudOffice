@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: erp_guacamole_db
       POSTGRES_USER: guacamole
-      POSTGRES_PASSWORD: ErpDb2026!
+      POSTGRES_PASSWORD: ${ERP_DB_PASSWORD}
     volumes:
       - erp_pgdata:/var/lib/postgresql/data
       - ./init:/docker-entrypoint-initdb.d
@@ -28,7 +28,7 @@ services:
       POSTGRESQL_PORT: 5432
       POSTGRESQL_DATABASE: erp_guacamole_db
       POSTGRESQL_USER: guacamole
-      POSTGRESQL_PASSWORD: ErpDb2026!
+      POSTGRESQL_PASSWORD: ${ERP_DB_PASSWORD}
       GUACAMOLE_HOME: /etc/guacamole
     volumes:
       - ./guacamole-home:/etc/guacamole

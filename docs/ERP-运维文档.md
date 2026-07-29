@@ -13,8 +13,8 @@
 
 | 操作 | 命令/地址 |
 |------|----------|
-| SSH 登录主库 | `ssh debian@192.168.2.3` (密码: 9090, sudo: 9090) |
-| SSH 登录备机 | `ssh debian@192.168.2.88` (通过跳板: 192.168.2.3) |
+| SSH 登录主库 | `ssh debian@<MASTER_IP>` (需配置密钥) |
+| SSH 登录备机 | `ssh debian@<STANDBY_IP>` (通过跳板) |
 | ERP 登录页 | https://erp.oascii.com:8443 |
 | ERP Guacamole 管理 | 用 guacadmin 登录后 → 右上角 → Settings |
 | 邮箱管理页 | https://erp.oascii.com:8443/api/erp-auth/admin/emails-page (需管理员登录) |
@@ -163,7 +163,7 @@ cd /home/debian/Cloud/erp-guacamole && docker-compose up -d
 ```bash
 # 获取管理员 token
 TOKEN=$(curl -s -X POST http://127.0.0.1:8082/guacamole/api/tokens \
-  -d "username=guacadmin&password=****REDACTED****" | python3 -c "import sys,json;print(json.load(sys.stdin)['authToken'])")
+  -d "username=guacadmin&password=****" | python3 -c "import sys,json;print(json.load(sys.stdin)['authToken'])")
 
 # 创建用户
 curl -X POST http://127.0.0.1:8082/guacamole/api/session/data/postgresql/users \

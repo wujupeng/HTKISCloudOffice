@@ -4,8 +4,8 @@ import subprocess, sys
 
 # Test 1: Check if master port is reachable from standby
 result = subprocess.run(
-    ["docker", "run", "--rm", "--network", "host", "-e", "PGPASSWORD=****REDACTED****",
-     "postgres:15", "psql", "-h", "192.168.2.3", "-p", "5435",
+    ["docker", "run", "--rm", "--network", "host", "-e", "PGPASSWORD=****",
+     "postgres:15", "psql", "-h", "****", "-p", "5435",
      "-U", "replicator", "-d", "erp_guacamole_db", "-c", "SELECT 1;"],
     capture_output=True, text=True, timeout=30
 )

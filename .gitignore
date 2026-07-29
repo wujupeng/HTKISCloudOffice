@@ -54,6 +54,15 @@ deploy/test_*.py
 deploy/create_test_doc.py
 deploy/guacamole/install-vnc-ssh.sh
 deploy/guacamole/patch-en.py
+deploy/scripts/test_*.py
+deploy/scripts/check_*.py
+deploy/scripts/guac_*.py
+deploy/scripts/change_*.py
+deploy/scripts/create_*.py
+deploy/scripts/grant_*.py
+deploy/scripts/list_*.py
+deploy/scripts/setup_standby_mirror.py
+test_task.py
 
 # Offline build output
 htkis-cloud-office-*-offline/

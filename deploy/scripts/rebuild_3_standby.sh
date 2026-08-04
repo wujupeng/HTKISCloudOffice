@@ -15,7 +15,7 @@ docker volume create erp-guacamole_erp_pgdata
 echo "Starting pg_basebackup from 192.168.2.114:5435..."
 docker run --rm \
   --network host \
-  -e PGPASSWORD='****REDACTED****' \
+  -e PGPASSWORD='${REPL_PASSWORD}' \
   -v erp-guacamole_erp_pgdata:/var/lib/postgresql/data \
   postgres:15 \
   bash -c "rm -rf /var/lib/postgresql/data/* && pg_basebackup -h 192.168.2.114 -p 5435 -U replicator -D /var/lib/postgresql/data -Fp -Xs -P -R && chown -R 999:999 /var/lib/postgresql/data"

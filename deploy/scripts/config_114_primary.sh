@@ -8,7 +8,7 @@ sed -i 's/127.0.0.1:5435:5432/5435:5432/' /home/debian/Cloud/erp-guacamole/docke
 cd /home/debian/Cloud/erp-guacamole && docker-compose up -d postgres
 
 # 3. Add UFW rule for 192.168.2.3
-echo 9090 | sudo -S ufw allow from 192.168.2.3 to any port 5435 proto tcp 2>&1
+echo "$SUDO_PASSWORD" | sudo -S ufw allow from $BACKUP_IP to any port 5435 proto tcp 2>&1
 
 # 4. Verify
 docker port erp-guac-postgres

@@ -181,7 +181,7 @@ curl -X POST http://127.0.0.1:8082/guacamole/api/session/data/postgresql/users \
 
 | 用户名 | 密码 | 角色 |
 |--------|------|------|
-| guacadmin | ****REDACTED**** | 系统管理员 |
+| guacadmin | ***** | 系统管理员 |
 
 ---
 

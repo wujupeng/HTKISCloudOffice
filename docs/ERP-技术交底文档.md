@@ -2,8 +2,8 @@
 
 | 项目 | 内容 |
 |------|------|
-| 文档版本 | v2.0 |
-| 编写日期 | 2026-07-29 |
+| 文档版本 | v3.0 |
+| 编写日期 | 2026-08-04 |
 | 状态 | 已发布 |
 | 访问地址 | https://erp.oascii.com:8443 |
 
@@ -17,7 +17,7 @@ ERP 云办公平台基于 Apache Guacamole 实现，将 ERP Windows Server 的 R
 
 **安卓平板 Chrome → erp.oascii.com:8443 → 宝山路由器(NAT) → 192.168.2.200:8443(VIP) → Nginx SSL → 邮箱验证(auth_request) → Guacamole Header认证 → guacd → RDP → 192.168.2.120:3389**
 
-> VIP 192.168.2.200 由 Keepalived 管理，自动在主库(192.168.2.3)和备机(192.168.2.88)之间切换。
+> VIP 192.168.2.200 由 Keepalived 管理，自动在主库(192.168.2.114)和备机(192.168.2.3)之间切换。
 
 ---
 
@@ -45,7 +45,7 @@ ERP 云办公平台基于 Apache Guacamole 实现，将 ERP Windows Server 的 R
                          │              │
               ┌──────────▼──┐    ┌─────▼──────────┐
               │  主库 MASTER │    │  备机 BACKUP    │
-              │  192.168.2.3 │    │  192.168.2.88   │
+              │  192.168.2.114│    │  192.168.2.3    │
               │  priority=100│    │  priority=90    │
               └──────┬───────┘    └──────┬──────────┘
                      │                   │
@@ -92,8 +92,8 @@ ERP 云办公平台基于 Apache Guacamole 实现，将 ERP Windows Server 的 R
 
 | 角色 | IP | 操作系统 | 用途 |
 |------|-----|---------|------|
-| Debian 主服务器 (MASTER) | 192.168.2.3 | Debian 13 | Nginx + Guacamole + 邮箱验证 + guacd |
-| Debian 备服务器 (BACKUP) | 192.168.2.88 | Debian 13 | 同主服务器，热备 |
+| Debian 主服务器 (MASTER) | 192.168.2.114 | Debian 13 | Nginx + Guacamole + 邮箱验证 + guacd |
+| Debian 备服务器 (BACKUP) | 192.168.2.3 | Debian 13 | 同主服务器，热备 |
 | VIP (Keepalived) | 192.168.2.200 | — | 浮动 IP，自动跟随 MASTER |
 | 宝山工厂路由器 | 210.22.123.254 | — | 公网 NAT 端口转发 |
 | ERP Windows Server | 192.168.2.120 | Windows Server | RDP 目标机，运行 ERP 软件 |
@@ -126,11 +126,11 @@ ERP 云办公平台基于 Apache Guacamole 实现，将 ERP Windows Server 的 R
 
 ### 4.1 Keepalived 配置
 
-| 项目 | 主库 192.168.2.3 | 备机 192.168.2.88 |
+| 项目 | 主库 192.168.2.114 | 备机 192.168.2.3 |
 |------|------------------|-------------------|
 | 角色 | MASTER | BACKUP |
 | priority | 100 | 90 |
-| 网络接口 | enp2s0 | eth0 |
+| 网络接口 | eth0 | enp3s0 |
 | virtual_router_id | 51 | 51 |
 | VIP | 192.168.2.200/24 | 192.168.2.200/24 |
 | 认证密码 | ****REDACTED**** (PASS) | ****REDACTED**** (PASS) |
@@ -153,7 +153,7 @@ Keepalived 通过 `/etc/keepalived/check_container.sh` 检测容器状态：
 | max_wal_senders | 3 |
 | wal_keep_size | 64MB |
 | hot_standby | on |
-| pg_hba.conf | host replication replicator 192.168.2.88/32 md5 |
+| pg_hba.conf | host replication replicator 192.168.2.3/32 md5 |
 
 ### 4.4 主备切换流程
 
@@ -237,7 +237,7 @@ Keepalived 通过 `/etc/keepalived/check_container.sh` 检测容器状态：
 | 用户 | guacamole |
 | 端口 | 5435 (容器内 5432) |
 | 数据卷 | erp_pgdata |
-| 流复制 | 主库(192.168.2.3) → 备库(192.168.2.88)，异步模式 |
+| 流复制 | 主库(192.168.2.114) → 备库(192.168.2.3)，异步模式 |
 
 ### 邮箱验证服务表
 

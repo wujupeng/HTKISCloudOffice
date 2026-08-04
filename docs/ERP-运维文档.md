@@ -2,8 +2,8 @@
 
 | 项目 | 内容 |
 |------|------|
-| 文档版本 | v2.0 |
-| 编写日期 | 2026-07-29 |
+| 文档版本 | v3.0 |
+| 编写日期 | 2026-08-04 |
 | 状态 | 已发布 |
 | 访问地址 | https://erp.oascii.com:8443 |
 
@@ -14,7 +14,7 @@
 | 操作 | 命令/地址 |
 |------|----------|
 | SSH 登录主库 | `ssh debian@<MASTER_IP>` (需配置密钥) |
-| SSH 登录备机 | `ssh debian@<STANDBY_IP>` (通过跳板) |
+| SSH 登录备机 | `ssh debian@<BACKUP_IP>` (通过跳板) |
 | ERP 登录页 | https://erp.oascii.com:8443 |
 | ERP Guacamole 管理 | 用 guacadmin 登录后 → 右上角 → Settings |
 | 邮箱管理页 | https://erp.oascii.com:8443/api/erp-auth/admin/emails-page (需管理员登录) |

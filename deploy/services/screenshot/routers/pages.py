@@ -28,7 +28,7 @@ def check_admin(request: Request) -> str | None:
 @router.get("/")
 async def index(request: Request):
     if check_admin(request) is None:
-        return RedirectResponse(url="/api/email-auth/login-page")
+        return RedirectResponse(url="/login")
 
     templates_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
     env = Environment(loader=FileSystemLoader(templates_dir))

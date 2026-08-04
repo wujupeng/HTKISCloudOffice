@@ -100,7 +100,7 @@ async def emails_page(request: Request):
     admin = check_admin(request)
     if admin is None:
         from fastapi.responses import RedirectResponse
-        return RedirectResponse(url="/api/email-auth/login-page")
+        return RedirectResponse(url="/login")
 
     from fastapi.responses import HTMLResponse
     from jinja2 import Environment, FileSystemLoader

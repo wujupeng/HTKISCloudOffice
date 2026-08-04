@@ -337,7 +337,7 @@ async def verify_code(request: Request, response: Response, db: AsyncSession = D
 @router.post("/logout")
 async def logout(response: Response):
     clear_auth_cookie(response)
-    return {"success": True, "redirect": "/api/erp-auth/login-page"}
+    return {"success": True, "redirect": "/login"}
 
 
 @router.get("/login-page")

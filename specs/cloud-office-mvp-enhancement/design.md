@@ -42,10 +42,10 @@
 │   └─────────────────────────────────────────────────────────┘      │
 └─────────────────────────────────────────────────────────────────────┘
             │
-            │ frp 隧道 (x.x.x.214:7001 ←→ 192.168.2.3:frpc)
+            │ frp 隧道 (x.x.x.214:7001 ←→ <NEW_SERVER_IP>:frpc)
             │
 ┌───────────┼─────────────────────────────────────────────────────────┐
-│           ▼        Debian 服务器 (192.168.2.3) — 上海宝山 [新]      │
+│           ▼        Debian 服务器 (<NEW_SERVER_IP>) — 上海宝山 [新]      │
 │                                                                     │
 │   ┌─────────────────────────────────────────────────────────┐      │
 │   │  frpc (0.65.0)                                          │      │
@@ -85,11 +85,11 @@
             │ RDP 3389/TCP
             ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│              Windows Server (192.168.2.88) — 上海宝山                │
+│              Windows Server (<WIN_SERVER_IP>) — 上海宝山                │
 │                                                                     │
 │   RDP 服务: 3389/TCP (NLA模式)                                     │
 │   截屏脚本 [新增]: PowerShell 计划任务 (每10秒)                     │
-│   截屏输出: \\192.168.2.3\screenshots\{用户}\{日期}\               │
+│   截屏输出: \\<NEW_SERVER_IP>\screenshots\{用户}\{日期}\               │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -170,13 +170,13 @@
 在 Windows Server 上部署 PowerShell 截屏脚本，通过 Windows 计划任务每 10 秒执行一次。截屏文件通过 Samba 共享直接写入 Debian 服务器的 `/data/screenshots/` 目录。截屏管理服务读取该目录提供 Web 查看界面。
 
 ```
-Windows Server (192.168.2.88)
+Windows Server (<WIN_SERVER_IP>)
   │
   │ PowerShell 截屏脚本 (每10秒, 计划任务)
-  │ 输出: \\192.168.2.3\screenshots\{username}\{date}\{time}.png
+  │ 输出: \\<NEW_SERVER_IP>\screenshots\{username}\{date}\{time}.png
   │
   ▼
-Debian Server (192.168.2.3)
+Debian Server (<NEW_SERVER_IP>)
   /data/screenshots/  (Samba 共享)
   │
   │ 截屏管理服务 :5002 读取文件 + 元数据入库
@@ -193,7 +193,7 @@ Debian Server (192.168.2.3)
 
 ```
 迁移前:                              迁移后:
-192.168.2.102                        192.168.2.3
+<OLD_SERVER_IP>                        <NEW_SERVER_IP>
 ├─ Docker: Guacamole (3容器)         ├─ Docker: Guacamole (3容器, 配置更新)
 ├─ frpc → x.x.x.214:7001            ├─ frpc → x.x.x.214:7001 (配置不变)
 ├─ Samba /data/shares/public         ├─ Samba /data/shares/public (数据迁移)
@@ -208,26 +208,26 @@ Debian Server (192.168.2.3)
 
 **Phase 0: 准备阶段**
 
-1. 在 192.168.2.3 上安装基础环境：
+1. 在 <NEW_SERVER_IP> 上安装基础环境：
    - Docker Engine 26.x+、Docker Compose v2.26+
    - frp 0.65.0 (frpc)
    - Samba
    - Nginx (Docker 容器)
    - 创建目录结构：`~/Cloud/guacamole/`、`/data/shares/public`、`/data/screenshots`
 
-2. 验证 192.168.2.3 到 x.x.x.214:7001 网络连通性：
+2. 验证 <NEW_SERVER_IP> 到 x.x.x.214:7001 网络连通性：
    ```bash
    nc -zv x.x.x.214 7001
    ```
 
-3. 验证 192.168.2.3 到 192.168.2.88:3389 RDP 连通性：
+3. 验证 <NEW_SERVER_IP> 到 <WIN_SERVER_IP>:3389 RDP 连通性：
    ```bash
-   nc -zv 192.168.2.88 3389
+   nc -zv <WIN_SERVER_IP> 3389
    ```
 
 **Phase 1: 旧服务器数据备份**
 
-1. 停止 192.168.2.102 上的所有服务：
+1. 停止 <OLD_SERVER_IP> 上的所有服务：
    ```bash
    # 停止 frpc
    sudo systemctl stop frpc
@@ -266,21 +266,21 @@ Debian Server (192.168.2.3)
 
 1. 传输数据到新服务器：
    ```bash
-   # 从 192.168.2.102 传输到 192.168.2.3
-   scp /tmp/guacamole_db_backup.sql debian@192.168.2.3:/tmp/
-   scp /tmp/samba_public_backup.tar.gz debian@192.168.2.3:/tmp/
-   scp /tmp/frpc.toml.backup debian@192.168.2.3:/tmp/frpc.toml
-   scp /tmp/docker-compose.yml.backup debian@192.168.2.3:/tmp/docker-compose.yml
-   scp -r /tmp/guacamole-home.backup debian@192.168.2.3:/tmp/guacamole-home
+   # 从 <OLD_SERVER_IP> 传输到 <NEW_SERVER_IP>
+   scp /tmp/guacamole_db_backup.sql debian@<NEW_SERVER_IP>:/tmp/
+   scp /tmp/samba_public_backup.tar.gz debian@<NEW_SERVER_IP>:/tmp/
+   scp /tmp/frpc.toml.backup debian@<NEW_SERVER_IP>:/tmp/frpc.toml
+   scp /tmp/docker-compose.yml.backup debian@<NEW_SERVER_IP>:/tmp/docker-compose.yml
+   scp -r /tmp/guacamole-home.backup debian@<NEW_SERVER_IP>:/tmp/guacamole-home
    ```
 
-2. 部署 Guacamole（docker-compose.yml 需更新 GUACD_HOSTNAME 为 192.168.2.3）：
+2. 部署 Guacamole（docker-compose.yml 需更新 GUACD_HOSTNAME 为 <NEW_SERVER_IP>）：
    ```bash
    mkdir -p ~/Cloud/guacamole/init ~/Cloud/guacamole/guacamole-home
    # 复制 docker-compose.yml 并更新配置
    cp /tmp/docker-compose.yml ~/Cloud/guacamole/docker-compose.yml
    # 更新 GUACD_HOSTNAME 为新服务器 IP
-   sed -i 's/GUACD_HOSTNAME: .*/GUACD_HOSTNAME: 192.168.2.3/' ~/Cloud/guacamole/docker-compose.yml
+   sed -i 's/GUACD_HOSTNAME: .*/GUACD_HOSTNAME: <NEW_SERVER_IP>/' ~/Cloud/guacamole/docker-compose.yml
    # 复制 guacamole-home 配置
    cp -r /tmp/guacamole-home/* ~/Cloud/guacamole/guacamole-home/
    # 复制初始化 SQL
@@ -355,12 +355,12 @@ Debian Server (192.168.2.3)
 5. 验证 Samba：
    ```bash
    # 从 Windows Server 测试
-   dir \\192.168.2.3\public
+   dir \\<NEW_SERVER_IP>\public
    ```
 
 **Phase 4: 旧服务器退役**
 
-1. 确认新服务器所有服务正常后，停止 192.168.2.102 上的服务：
+1. 确认新服务器所有服务正常后，停止 <OLD_SERVER_IP> 上的服务：
    ```bash
    sudo systemctl stop frpc
    sudo systemctl disable frpc
@@ -373,8 +373,8 @@ Debian Server (192.168.2.3)
 
 若迁移验证失败，执行以下回滚步骤：
 
-1. 停止 192.168.2.3 上的 frpc（避免端口冲突）
-2. 在 192.168.2.102 上重新启动所有服务：
+1. 停止 <NEW_SERVER_IP> 上的 frpc（避免端口冲突）
+2. 在 <OLD_SERVER_IP> 上重新启动所有服务：
    ```bash
    cd ~/guacamole && docker compose up -d
    sudo systemctl start frpc
@@ -550,18 +550,18 @@ Response: { "success": true, "message": "邮箱绑定成功" }
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  Windows Server (192.168.2.88)                                   │
+│  Windows Server (<WIN_SERVER_IP>)                                   │
 │                                                                   │
 │  截屏脚本: C:\Scripts\capture-screen.ps1                         │
 │  计划任务: HTKIS-Screenshot (每10秒, 仅在用户会话活跃时运行)      │
 │                                                                   │
-│  输出路径: \\192.168.2.3\screenshots\{username}\{date}\{time}.png│
+│  输出路径: \\<NEW_SERVER_IP>\screenshots\{username}\{date}\{time}.png│
 │  清理脚本: C:\Scripts\cleanup-screenshots.ps1 (每天, 删除>90天)  │
 └───────────────────────────┬──────────────────────────────────────┘
                             │ Samba 写入
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Debian Server (192.168.2.3)                                     │
+│  Debian Server (<NEW_SERVER_IP>)                                     │
 │                                                                   │
 │  /data/screenshots/  (Samba 共享 "screenshots")                  │
 │  ├── tablet/                                                      │
@@ -590,7 +590,7 @@ Response: { "success": true, "message": "邮箱绑定成功" }
 ```powershell
 # 核心逻辑伪代码
 param(
-    [string]$SambaPath = "\\192.168.2.3\screenshots",
+    [string]$SambaPath = "\\<NEW_SERVER_IP>\screenshots",
     [int]$Quality = 75  # JPEG 质量 (1-100)
 )
 
@@ -1473,7 +1473,7 @@ services:
     ports:
       - "127.0.0.1:8081:8080"  # 变更: 仅绑定本地 8081
     environment:
-      GUACD_HOSTNAME: 192.168.2.3  # 变更: 更新为新服务器 IP
+      GUACD_HOSTNAME: <NEW_SERVER_IP>  # 变更: 更新为新服务器 IP
       GUACD_PORT: 4822
       POSTGRESQL_HOSTNAME: postgres
       POSTGRESQL_PORT: 5432
@@ -1493,7 +1493,7 @@ volumes:
 
 **关键变更**：
 1. `guacamole` 端口从 `8080:8080` 改为 `127.0.0.1:8081:8080`，仅本地可访问
-2. `GUACD_HOSTNAME` 更新为 `192.168.2.3`
+2. `GUACD_HOSTNAME` 更新为 `<NEW_SERVER_IP>`
 3. frpc 的 `localPort` 保持 `8080`（指向 Nginx 反代）
 
 ## 5.2 Samba 配置变更
@@ -1565,8 +1565,8 @@ ADMIN_USERNAMES="guacadmin"
 HTKIS_DB_PASSWORD="****"
 
 # ====== 迁移配置 ======
-OLD_SERVER_HOST="192.168.2.102"
-NEW_SERVER_HOST="192.168.2.3"
+OLD_SERVER_HOST="<OLD_SERVER_IP>"
+NEW_SERVER_HOST="<NEW_SERVER_IP>"
 ```
 
 ## 5.5 启动顺序
@@ -1600,7 +1600,7 @@ cd ~/Cloud/guacamole && bash patch-title.sh "Htkis-Cloud"
 
 ## 5.6 Windows Server 截屏脚本部署
 
-在 Windows Server (192.168.2.88) 上执行：
+在 Windows Server (<WIN_SERVER_IP>) 上执行：
 
 ```powershell
 # 1. 复制截屏脚本

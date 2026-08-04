@@ -10,7 +10,7 @@
 2. **管理员操作指令**：管理员绑定/修改用户邮箱、查看截屏记录
 3. **RDP 桌面画面流**：Guacamole guacd 层面的 RDP 图形数据流
 4. **定时截屏触发信号**：每 10 秒触发的截屏采集信号
-5. **迁移源服务器状态**：192.168.2.102 上的服务运行状态与数据
+5. **迁移源服务器状态**：<OLD_SERVER_IP> 上的服务运行状态与数据
 
 ## 1.3 核心输出
 
@@ -18,13 +18,13 @@
 2. **登录认证结果**：验证通过/失败的认证响应
 3. **截屏图片文件**：按用户+日期组织的 PNG/JPEG 截屏文件
 4. **截屏管理界面**：管理员查看历史截屏的 Web 页面
-5. **迁移后服务可用性**：192.168.2.3 上完整恢复的所有服务
+5. **迁移后服务可用性**：<NEW_SERVER_IP> 上完整恢复的所有服务
 
 ## 1.4 职责边界
 
 - **不负责** Guacamole 核心源码修改，所有扩展通过外部服务或 API 集成实现
 - **不负责** Windows Server RDP 服务端配置变更
-- **不负责** 公网 Ubuntu 服务器 (8.210.239.214) 的 nginx/frps 配置变更（仅 frpc 端指向更新）
+- **不负责** 公网 Ubuntu 服务器 (x.x.x.214) 的 nginx/frps 配置变更（仅 frpc 端指向更新）
 - **不负责** RDP 驱动器重定向功能（已知限制，Win Server 拒绝该连接）
 - **不负责** 邮件服务商基础设施搭建，使用第三方 SMTP 服务
 
@@ -46,7 +46,7 @@
 : 定义截屏数据的最长存储时间，超期截屏自动删除。
 
 **服务器迁移**
-: 将 192.168.2.102 上的所有服务与数据完整迁移至 192.168.2.3 的操作过程。
+: 将 <OLD_SERVER_IP> 上的所有服务与数据完整迁移至 <NEW_SERVER_IP> 的操作过程。
 
 **frpc 客户端**
 : 部署在内网服务器上的 frp 客户端，负责建立到公网 frps 的反向代理隧道。
@@ -146,27 +146,27 @@ uc3 --> frps : frpc 重连
 
 ### 5.1.1 业务规则
 
-1. **迁移完整性规则**：迁移必须覆盖 192.168.2.102 上的全部服务，包括 Guacamole（Docker 三容器）、frpc、Samba 及所有关联数据
+1. **迁移完整性规则**：迁移必须覆盖 <OLD_SERVER_IP> 上的全部服务，包括 Guacamole（Docker 三容器）、frpc、Samba 及所有关联数据
 
-   a. 验收条件：When 迁移完成，the 系统 shall 在 192.168.2.3 上提供与 192.168.2.102 完全一致的服务集合
+   a. 验收条件：When 迁移完成，the 系统 shall 在 <NEW_SERVER_IP> 上提供与 <OLD_SERVER_IP> 完全一致的服务集合
 
 2. **数据一致性规则**：Guacamole PostgreSQL 数据库、Samba 共享文件、frpc 配置文件必须完整迁移，不得遗漏
 
-   a. 验收条件：When 迁移完成，the 系统 shall 在 192.168.2.3 上保留 192.168.2.102 的全部用户数据、连接配置和共享文件
+   a. 验收条件：When 迁移完成，the 系统 shall 在 <NEW_SERVER_IP> 上保留 <OLD_SERVER_IP> 的全部用户数据、连接配置和共享文件
 
-3. **frpc 重指向规则**：迁移后 frpc 必须从 192.168.2.3 发起连接，frpc 配置中的 localIP 保持 127.0.0.1 不变
+3. **frpc 重指向规则**：迁移后 frpc 必须从 <NEW_SERVER_IP> 发起连接，frpc 配置中的 localIP 保持 127.0.0.1 不变
 
-   a. 验收条件：When 迁移完成且 frpc 启动，the frpc shall 成功连接至 frps (8.210.239.214:7001) 并建立隧道
+   a. 验收条件：When 迁移完成且 frpc 启动，the frpc shall 成功连接至 frps (x.x.x.214:7001) 并建立隧道
 
-4. **RDP 连接更新规则**：迁移后 Guacamole 的 RDP 连接配置必须指向 192.168.2.88，确保 RDP 链路正常
+4. **RDP 连接更新规则**：迁移后 Guacamole 的 RDP 连接配置必须指向 <WIN_SERVER_IP>，确保 RDP 链路正常
 
-   a. 验收条件：When 迁移完成，the Guacamole shall 成功通过 RDP 连接至 192.168.2.88
+   a. 验收条件：When 迁移完成，the Guacamole shall 成功通过 RDP 连接至 <WIN_SERVER_IP>
 
-5. **旧服务器退役规则**：迁移验证通过后，192.168.2.102 上的服务应停止运行，避免服务冲突
+5. **旧服务器退役规则**：迁移验证通过后，<OLD_SERVER_IP> 上的服务应停止运行，避免服务冲突
 
-   a. 验收条件：When 迁移验证通过，the 管理员 shall 停止 192.168.2.102 上的 Guacamole、frpc、Samba 服务
+   a. 验收条件：When 迁移验证通过，the 管理员 shall 停止 <OLD_SERVER_IP> 上的 Guacamole、frpc、Samba 服务
 
-6. **禁止项**：禁止在迁移过程中修改公网 Ubuntu 服务器 (8.210.239.214) 的 frps 配置
+6. **禁止项**：禁止在迁移过程中修改公网 Ubuntu 服务器 (x.x.x.214) 的 frps 配置
 
    a. 验收条件：When 迁移完成，the frps 配置 shall 保持不变
 
@@ -175,9 +175,9 @@ uc3 --> frps : frpc 重连
 ```plantuml
 @startuml
 actor 管理员 as admin
-participant "新服务器\n192.168.2.3" as new
-participant "旧服务器\n192.168.2.102" as old
-participant "公网服务器\n8.210.239.214" as pub
+participant "新服务器\n<NEW_SERVER_IP>" as new
+participant "旧服务器\n<OLD_SERVER_IP>" as old
+participant "公网服务器\nx.x.x.214" as pub
 
 admin -> old : 停止所有服务（Guacamole/frpc/Samba）
 admin -> old : 导出 PostgreSQL 数据
@@ -187,7 +187,7 @@ admin -> new : 部署 Docker 环境
 admin -> new : 部署 Guacamole（docker-compose）
 admin -> new : 导入 PostgreSQL 数据
 admin -> new : 部署 Samba 并恢复共享文件
-admin -> new : 部署 frpc（指向 8.210.239.214:7001）
+admin -> new : 部署 frpc（指向 x.x.x.214:7001）
 new -> pub : frpc 建立隧道连接
 admin -> new : 验证全链路（Guacamole → RDP → Win Server）
 admin -> old : 确认迁移成功，停止旧服务器服务
@@ -206,7 +206,7 @@ admin -> old : 确认迁移成功，停止旧服务器服务
 
 2. **frpc 隧道连接失败**
 
-   a. 触发条件：新服务器 frpc 无法连接至 frps (8.210.239.214:7001)
+   a. 触发条件：新服务器 frpc 无法连接至 frps (x.x.x.214:7001)
 
    b. 系统行为：frpc 自动重试，超过重试次数后记录错误日志
 
@@ -214,7 +214,7 @@ admin -> old : 确认迁移成功，停止旧服务器服务
 
 3. **RDP 连接验证失败**
 
-   a. 触发条件：迁移后 Guacamole 无法通过 RDP 连接至 192.168.2.88
+   a. 触发条件：迁移后 Guacamole 无法通过 RDP 连接至 <WIN_SERVER_IP>
 
    b. 系统行为：guacd 返回连接错误日志
 
@@ -521,8 +521,8 @@ storage -> storage : 删除超期截屏文件
 
 ## 6.5 迁移配置
 
-1. **源服务器地址**：192.168.2.102，迁移完成后标记为"已退役"
-2. **目标服务器地址**：192.168.2.3，迁移完成后标记为"生产"
+1. **源服务器地址**：<OLD_SERVER_IP>，迁移完成后标记为"已退役"
+2. **目标服务器地址**：<NEW_SERVER_IP>，迁移完成后标记为"生产"
 3. **迁移时间窗口**：计划迁移的起止时间，不可为空
 4. **迁移状态**：取值为"待迁移"/"迁移中"/"验证中"/"已完成"/"回滚中"，初始为"待迁移"
 5. **数据校验结果**：迁移后各服务与数据的校验结果，不可为空

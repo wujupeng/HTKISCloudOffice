@@ -15,9 +15,9 @@ ERP 云办公平台基于 Apache Guacamole 实现，将 ERP Windows Server 的 R
 
 核心链路：
 
-**安卓平板 Chrome → erp.oascii.com:8443 → 宝山路由器(NAT) → 192.168.2.200:8443(VIP) → Nginx SSL → 邮箱验证(auth_request) → Guacamole Header认证 → guacd → RDP → 192.168.2.120:3389**
+**安卓平板 Chrome → erp.oascii.com:8443 → 宝山路由器(NAT) → <VIP_IP>:8443(VIP) → Nginx SSL → 邮箱验证(auth_request) → Guacamole Header认证 → guacd → RDP → <WIN_SERVER_IP>:3389**
 
-> VIP 192.168.2.200 由 Keepalived 管理，自动在主库(192.168.2.114)和备机(192.168.2.3)之间切换。
+> VIP 192.168.x.200 由 Keepalived 管理，自动在主库(<MASTER_IP>)和备机(<BACKUP_IP>)之间切换。
 
 ---
 
@@ -32,20 +32,20 @@ ERP 云办公平台基于 Apache Guacamole 实现，将 ERP Windows Server 的 R
                                  ▼
                     ┌────────────────────────┐
                     │   宝山工厂路由器        │
-                    │   210.22.123.254       │
+                    │   x.x.x.x       │
                     │   端口转发:            │
-                    │   8443→192.168.2.200:8443│
+                     │   8443→<VIP_IP>:8443│
                     └────────────┬───────────┘
                                  │ HTTPS :8443
                                  ▼
                     ┌────────────────────────┐
-                    │   VIP 192.168.2.200    │
+                     │   VIP <VIP_IP>     │
                     │   (Keepalived 管理)    │
                     └────┬──────────────┬───┘
                          │              │
               ┌──────────▼──┐    ┌─────▼──────────┐
-              │  主库 MASTER │    │  备机 BACKUP    │
-              │  192.168.2.114│    │  192.168.2.3    │
+               │  主库 MASTER │    │  备机 BACKUP    │
+               │  <MASTER_IP>│    │  <BACKUP_IP>    │
               │  priority=100│    │  priority=90    │
               └──────┬───────┘    └──────┬──────────┘
                      │                   │
@@ -79,8 +79,8 @@ ERP 云办公平台基于 Apache Guacamole 实现，将 ERP Windows Server 的 R
                                    │ RDP :3389
                                    ▼
                         ┌─────────────────────┐
-                        │  ERP Windows Server  │
-                        │  192.168.2.120       │
+                         │  ERP Windows Server  │
+                         │  <WIN_SERVER_IP>      │
                         └─────────────────────┘
 ```
 
@@ -92,11 +92,11 @@ ERP 云办公平台基于 Apache Guacamole 实现，将 ERP Windows Server 的 R
 
 | 角色 | IP | 操作系统 | 用途 |
 |------|-----|---------|------|
-| Debian 主服务器 (MASTER) | 192.168.2.114 | Debian 13 | Nginx + Guacamole + 邮箱验证 + guacd |
-| Debian 备服务器 (BACKUP) | 192.168.2.3 | Debian 13 | 同主服务器，热备 |
-| VIP (Keepalived) | 192.168.2.200 | — | 浮动 IP，自动跟随 MASTER |
-| 宝山工厂路由器 | 210.22.123.254 | — | 公网 NAT 端口转发 |
-| ERP Windows Server | 192.168.2.120 | Windows Server | RDP 目标机，运行 ERP 软件 |
+| Debian 主服务器 (MASTER) | <MASTER_IP> | Debian 13 | Nginx + Guacamole + 邮箱验证 + guacd |
+| Debian 备服务器 (BACKUP) | <BACKUP_IP> | Debian 13 | 同主服务器，热备 |
+| VIP (Keepalived) | <VIP_IP> | — | 浮动 IP，自动跟随 MASTER |
+| 宝山工厂路由器 | x.x.x.x | — | 公网 NAT 端口转发 |
+| ERP Windows Server | <WIN_SERVER_IP> | Windows Server | RDP 目标机，运行 ERP 软件 |
 
 ### 3.2 Docker 容器（主/备机同构部署）
 
@@ -112,7 +112,7 @@ ERP 云办公平台基于 Apache Guacamole 实现，将 ERP Windows Server 的 R
 
 | 外部端口 | 内部端口 | 协议 | 用途 |
 |---------|---------|------|------|
-| 8443 (宝山路由器) | 192.168.2.200:8443 (VIP) | HTTPS | ERP 公网入口 |
+| 8443 (宝山路由器) | <VIP_IP>:8443 (VIP) | HTTPS | ERP 公网入口 |
 | 8443 (Nginx) | — | HTTPS/SSL | ERP SSL 终结 |
 | 8080 (Nginx) | — | HTTP | HTKIS 入口 + ERP HTTP→HTTPS 重定向 |
 | 8082 | — | HTTP | ERP Guacamole 内部 |
@@ -126,14 +126,14 @@ ERP 云办公平台基于 Apache Guacamole 实现，将 ERP Windows Server 的 R
 
 ### 4.1 Keepalived 配置
 
-| 项目 | 主库 192.168.2.114 | 备机 192.168.2.3 |
+| 项目 | 主库 <MASTER_IP> | 备机 <BACKUP_IP> |
 |------|------------------|-------------------|
 | 角色 | MASTER | BACKUP |
 | priority | 100 | 90 |
 | 网络接口 | eth0 | enp3s0 |
 | virtual_router_id | 51 | 51 |
-| VIP | 192.168.2.200/24 | 192.168.2.200/24 |
-| 认证密码 | ****REDACTED**** (PASS) | ****REDACTED**** (PASS) |
+| VIP | <VIP_IP>/24 | <VIP_IP>/24 |
+| 认证密码 | **** (PASS) | **** (PASS) |
 
 ### 4.2 健康检查
 
@@ -153,13 +153,13 @@ Keepalived 通过 `/etc/keepalived/check_container.sh` 检测容器状态：
 | max_wal_senders | 3 |
 | wal_keep_size | 64MB |
 | hot_standby | on |
-| pg_hba.conf | host replication replicator 192.168.2.3/32 md5 |
+| pg_hba.conf | host replication replicator <BACKUP_IP>/32 md5 |
 
 ### 4.4 主备切换流程
 
 1. 主库故障（Nginx/Guacamole 容器停止或服务器宕机）
 2. Keepalived 健康检查失败 3 次（约 15 秒）
-3. MASTER 降级，VIP 192.168.2.200 迁移到备机
+3. MASTER 降级，VIP 迁移到备机
 4. 备机接管所有 ERP 流量
 5. 主库恢复后，VIP 自动回切到主库（priority 更高）
 
@@ -193,7 +193,7 @@ Keepalived 通过 `/etc/keepalived/check_container.sh` 检测容器状态：
          │   根据 Remote-User 自动登录
          │                │
          │                ▼
-         │   guacd:4822 → RDP → 192.168.2.120:3389
+         │   guacd:4822 → RDP → <WIN_SERVER_IP>:3389
          │
          └─ 断开连接检测 (sub_filter JS 注入)
              检测到"您的连接已断开"→ 自动登出 → 返回登录页
@@ -237,7 +237,7 @@ Keepalived 通过 `/etc/keepalived/check_container.sh` 检测容器状态：
 | 用户 | guacamole |
 | 端口 | 5435 (容器内 5432) |
 | 数据卷 | erp_pgdata |
-| 流复制 | 主库(192.168.2.114) → 备库(192.168.2.3)，异步模式 |
+| 流复制 | 主库(<MASTER_IP>) → 备库(<BACKUP_IP>)，异步模式 |
 
 ### 邮箱验证服务表
 

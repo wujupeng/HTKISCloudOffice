@@ -64,7 +64,7 @@ docker exec htkis-nginx nginx -s reload
 docker restart guacd
 ```
 
-> **注意：备机 192.168.2.88 使用 `docker-compose` 命令（不是 `docker compose`），且需要 `-f` 参数指定文件路径。**
+> **注意：备机使用 `docker-compose` 命令（不是 `docker compose`），且需要 `-f` 参数指定文件路径。**
 
 ### 2.3 查看日志
 
@@ -100,7 +100,7 @@ sudo systemctl status keepalived
 sudo journalctl -u keepalived --since "10 minutes ago" --no-pager
 
 # 查看 VIP 是否在本机
-ip addr show | grep 192.168.2.200
+ip addr show | grep <VIP_IP>
 ```
 
 ### 3.2 手动切换主备
@@ -136,11 +136,11 @@ docker volume rm erp-guacamole_erp_pgdata
 
 # 2. 用 pg_basebackup 重新同步
 docker run --rm --network host \
-  -e PGPASSWORD='****REDACTED****' \
+  -e PGPASSWORD='$REPL_PASSWORD' \
   -v erp-guacamole_erp_pgdata:/var/lib/postgresql/data \
   postgres:15 \
   bash -c "rm -rf /var/lib/postgresql/data/* && \
-    pg_basebackup -h 192.168.2.3 -p 5435 -U replicator -D /var/lib/postgresql/data -Fp -Xs -P -R && \
+    pg_basebackup -h <MASTER_IP> -p 5435 -U replicator -D /var/lib/postgresql/data -Fp -Xs -P -R && \
     chown -R 999:999 /var/lib/postgresql/data"
 
 # 3. 重新启动 ERP 容器
@@ -181,7 +181,7 @@ curl -X POST http://127.0.0.1:8082/guacamole/api/session/data/postgresql/users \
 
 | 用户名 | 密码 | 角色 |
 |--------|------|------|
-| guacadmin | ***** | 系统管理员 |
+| guacadmin | **** | 系统管理员 |
 
 ---
 
@@ -203,7 +203,7 @@ sudo certbot renew --manual --preferred-challenges dns
 docker exec htkis-nginx nginx -s reload
 
 # 续期后同步证书到备机
-scp -r /etc/letsencrypt/live/erp.oascii.com/ debian@192.168.2.88:/etc/letsencrypt/live/erp.oascii.com/
+scp -r /etc/letsencrypt/live/erp.oascii.com/ debian@<BACKUP_IP>:/etc/letsencrypt/live/erp.oascii.com/
 ```
 
 ### 5.3 自动续期
@@ -244,7 +244,7 @@ sudo ufw status numbered
 |------|------|------|------|
 | 8443/tcp | 8443 | Anywhere | ERP HTTPS 公网入口 |
 | 4822/tcp | 4822 | 172.16.0.0/12 | guacd (Docker 容器访问) |
-| 5435/tcp | 5435 | 192.168.2.88 | PostgreSQL 流复制（主库） |
+| 5435/tcp | 5435 | <BACKUP_IP> | PostgreSQL 流复制（主库） |
 
 ---
 
@@ -261,7 +261,7 @@ sudo ufw status numbered
 | SSL 证书错误 | 证书过期 | `sudo certbot certificates` |
 | 400 Bad Request | HTTP 请求发送到 HTTPS 端口 | 确保使用 https:// 访问 |
 | 断开连接不返回登录页 | sub_filter JS 注入失败 | 检查 Nginx 配置中 `proxy_set_header Accept-Encoding ""` |
-| VIP 不可达 | Keepalived 未运行 | `sudo systemctl status keepalived`; `ip addr show \| grep 192.168.2.200` |
+| VIP 不可达 | Keepalived 未运行 | `sudo systemctl status keepalived`; `ip addr show \| grep <VIP_IP>` |
 | 流复制中断 | 备库 PostgreSQL 未运行 | 主库: `SELECT * FROM pg_stat_replication;` |
 
 ### 8.2 端到端连通性测试+测试
@@ -277,7 +277,7 @@ curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8082/guacamole/
 curl -sk https://127.0.0.1:8443/api/erp-auth/login-page | head -3
 
 # 测试 VIP 上的 ERP 服务
-curl -sk -o /dev/null -w "%{http_code}" https://192.168.2.200:8443/
+curl -sk -o /dev/null -w "%{http_code}" https://<VIP_IP>:8443/
 ```
 
 ---
@@ -286,7 +286,7 @@ curl -sk -o /dev/null -w "%{http_code}" https://192.168.2.200:8443/
 
 | 外网端口 | 内网 IP | 内网端口 | 协议 | 用途 |
 |---------|---------|---------|------|------|
-| 8443 | 192.168.2.200 (VIP) | 8443 | TCP | ERP HTTPS |
+| 8443 | <VIP_IP> (VIP) | 8443 | TCP | ERP HTTPS |
 
 **⚠️ 路由器管理界面需要现场访问或通过内网登录。**
 
@@ -296,7 +296,7 @@ curl -sk -o /dev/null -w "%{http_code}" https://192.168.2.200:8443/
 
 | 域名 | 类型 | 值 | 用途 |
 |------|------|-----|------|
-| erp.oascii.com | A | 210.22.123.254 | 指向宝山路由器 |
+| erp.oascii.com | A | x.x.x.x | 指向宝山路由器 |
 | _acme-challenge.erp.oascii.com | TXT | (证书续期时设置) | SSL 证书 DNS 验证 |
 
 DNS 服务商：阿里云 (dns9.hichina.com / dns10.hichina.com)
@@ -306,22 +306,22 @@ DNS 服务商：阿里云 (dns9.hichina.com / dns10.hichina.com)
 ## 11. 配置变更流程
 
 1. 本地修改代码/配置（`C:\Users\DELL\Documents\dev\HTKISCloudOffice\deploy\`）
-2. `scp` 上传到 192.168.2.3（主库）
-3. 同步到备机 192.168.2.88
+2. `scp` 上传到 <MASTER_IP>（主库）
+3. 同步到备机 <BACKUP_IP>
 4. 重建容器或 reload Nginx（主/备都需操作）
 5. 验证功能正常
 
 ```bash
 # 示例：更新 ERP 邮箱验证服务（主+备）
-scp -r deploy/services/erp-email-auth debian@192.168.2.3:/home/debian/Cloud/services/
-ssh debian@192.168.2.3 "cd /home/debian/Cloud/services && docker-compose build erp-email-auth && docker-compose up -d erp-email-auth"
+scp -r deploy/services/erp-email-auth debian@<MASTER_IP>:/home/debian/Cloud/services/
+ssh debian@<MASTER_IP> "cd /home/debian/Cloud/services && docker-compose build erp-email-auth && docker-compose up -d erp-email-auth"
 # 同步到备机
-ssh debian@192.168.2.3 "****REDACTED**** scp -r -o StrictHostKeyChecking=no /home/debian/Cloud/services/erp-email-auth debian@192.168.2.88:/home/debian/Cloud/services/"
-ssh debian@192.168.2.3 "****REDACTED**** ssh -o StrictHostKeyChecking=no debian@192.168.2.88 'cd /home/debian/Cloud/services && docker-compose build erp-email-auth && docker-compose up -d erp-email-auth'"
+ssh debian@<MASTER_IP> "scp -r -o StrictHostKeyChecking=no /home/debian/Cloud/services/erp-email-auth debian@<BACKUP_IP>:/home/debian/Cloud/services/"
+ssh debian@<MASTER_IP> "ssh -o StrictHostKeyChecking=no debian@<BACKUP_IP> 'cd /home/debian/Cloud/services && docker-compose build erp-email-auth && docker-compose up -d erp-email-auth'"
 
 # 示例：更新 Nginx 配置（主+备）
-scp deploy/services/nginx/nginx.conf debian@192.168.2.3:/home/debian/Cloud/services/nginx/nginx.conf
-ssh debian@192.168.2.3 "docker exec htkis-nginx nginx -t && docker exec htkis-nginx nginx -s reload"
+scp deploy/services/nginx/nginx.conf debian@<MASTER_IP>:/home/debian/Cloud/services/nginx/nginx.conf
+ssh debian@<MASTER_IP> "docker exec htkis-nginx nginx -t && docker exec htkis-nginx nginx -s reload"
 ```
 
 ---
@@ -332,7 +332,7 @@ ssh debian@192.168.2.3 "docker exec htkis-nginx nginx -t && docker exec htkis-ng
 - 验证码 5 分钟有效，5 次错误后失效
 - 验证码 60 秒内不可重发
 - 登录速率限制：10次/60秒/IP
-- Guacamole 管理员密码已修改为 `guacadmin/****REDACTED****`
+- Guacamole 管理员密码已修改（非默认密码）
 - Swagger /docs 端点已禁用
 - SSL 证书有效期 90 天，需定期续期并同步到备机
 - 宝山路由器仅开放 8443 端口，不暴露内网

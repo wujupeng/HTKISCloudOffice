@@ -6,7 +6,7 @@
 
 ```
 ┌─────────────┐     ┌──────────────────────────────────────────────┐
-│  安卓平板    │     │           Debian 13 服务器 (192.168.2.102)   │
+│  安卓平板    │     │           Debian 13 服务器 (192.168.x.x)    │
 │  Chrome浏览器│────▶│  ┌─────────┐  ┌───────────┐  ┌───────────┐ │
 │             │     │  │ Guacamole│  │   guacd   │  │  Samba    │ │
 │  Guacamole  │     │  │  :8080   │─▶│  :4822    │  │  :445     │ │
@@ -15,7 +15,7 @@
                                            │ RDP           │ SMB
                                            ▼               ▼
                                     ┌──────────────────────────────┐
-                                    │  Windows Server (192.168.2.88)│
+                                     │  Windows Server (192.168.x.x)│
                                     │  RDSH + WPS Office            │
                                     │  域: cii  用户: (见 credentials.env)    │
                                     └──────────────────────────────┘
@@ -31,8 +31,8 @@
 
 | 组件 | 要求 |
 |------|------|
-| 服务器 | Debian 13 (Trixie), IP: 192.168.2.102 |
-| Windows Server | 2019/2022, 已配置 RDSH, IP: 192.168.2.88 |
+| 服务器 | Debian 13 (Trixie), IP: 192.168.x.x |
+| Windows Server | 2019/2022, 已配置 RDSH, IP: 192.168.x.x |
 | Docker | 已安装并运行 |
 | 安卓平板 | Chrome 浏览器 |
 
@@ -40,10 +40,10 @@
 
 ```bash
 # 上传部署文件到服务器
-scp -r deploy/guacamole/ debian@192.168.2.102:/home/debian/Cloud/guacamole/
+scp -r deploy/guacamole/ debian@<SERVER_IP>:/home/debian/Cloud/guacamole/
 
 # SSH 到服务器
-ssh debian@192.168.2.102
+ssh debian@<SERVER_IP>
 
 # 启动 Guacamole
 cd /home/debian/Cloud/guacamole
@@ -96,12 +96,12 @@ sudo systemctl restart smbd nmbd
 3. **安装 WPS Office**：通过远程桌面在服务器上安装
 4. **映射共享驱动器**（可选）：
    ```
-   net use Z: \\192.168.2.102\public /user:debian <密码> /persistent:yes
+   net use Z: \\<SERVER_IP>\public /user:debian <密码> /persistent:yes
    ```
 
 ### 5. 验证
 
-1. 安卓平板 Chrome 打开 `http://192.168.2.102:8080/guacamole`
+1. 安卓平板 Chrome 打开 `http://<SERVER_IP>:8080/guacamole`
 2. 用户名和密码见 `credentials.env` 文件
 3. 点击 **Htkis-Cloud** 连接
 4. 验证远程桌面、文件传输功能
@@ -155,7 +155,7 @@ SAMBA_PASS=
 ### Guacamole docker-compose.yml
 
 - **guacd**: 使用 `network_mode: host`，确保能访问 Windows Server
-- **guacamole**: 通过 `192.168.2.102:4822` 连接 guacd
+- **guacamole**: 通过 `host.docker.internal:4822` 连接 guacd
 - **SFTP**: 启用文件传输，连接 Debian SSH，根目录 `/data/shares/public`
 
 ### user-mapping.xml

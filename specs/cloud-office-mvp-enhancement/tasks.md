@@ -20,29 +20,29 @@
 
 ## 1. 服务器迁移 — 环境准备
 
-- [ ] 1.1 在 192.168.2.3 上安装 Docker Engine 26.x+ 和 Docker Compose v2.26+
+- [ ] 1.1 在 <NEW_SERVER_IP> 上安装 Docker Engine 26.x+ 和 Docker Compose v2.26+
   - 依赖：无
   - 复杂度：中
   - 验收标准：`docker --version` 和 `docker compose version` 输出正确版本号
 
-- [ ] 1.2 在 192.168.2.3 上安装 frp 0.65.0 (frpc)
+- [ ] 1.2 在 <NEW_SERVER_IP> 上安装 frp 0.65.0 (frpc)
   - 依赖：1.1
   - 复杂度：小
   - 验收标准：`frpc --version` 输出 0.65.0
 
-- [ ] 1.3 在 192.168.2.3 上安装 Samba
+- [ ] 1.3 在 <NEW_SERVER_IP> 上安装 Samba
   - 依赖：1.1
   - 复杂度：小
   - 验收标准：`smbd --version` 输出版本号
 
-- [ ] 1.4 在 192.168.2.3 上创建目录结构
+- [ ] 1.4 在 <NEW_SERVER_IP> 上创建目录结构
   - 创建 `~/Cloud/guacamole/`、`~/Cloud/services/`、`/data/shares/public`、`/data/screenshots`
   - 依赖：1.1
   - 复杂度：小
   - 验收标准：所有目录存在且权限正确（`/data/shares/public` 权限 2777，`/data/screenshots` 权限 770）
 
-- [ ] 1.5 验证 192.168.2.3 到公网 frps 和 RDP 的网络连通性
-  - `nc -zv x.x.x.214 7001` 和 `nc -zv 192.168.2.88 3389`
+- [ ] 1.5 验证 <NEW_SERVER_IP> 到公网 frps 和 RDP 的网络连通性
+  - `nc -zv x.x.x.214 7001` 和 `nc -zv <WIN_SERVER_IP> 3389`
   - 依赖：1.2
   - 复杂度：小
   - 验收标准：两个端口均连通
@@ -61,7 +61,7 @@
   - 复杂度：小
   - 验收标准：模板包含所有迁移所需变量，带注释说明
 
-- [ ] 2.3 停止旧服务器 192.168.2.102 上的所有服务并备份数据
+- [ ] 2.3 停止旧服务器 <OLD_SERVER_IP> 上的所有服务并备份数据
   - 停止 frpc、Guacamole (docker compose down)、Samba
   - 导出 PostgreSQL 数据 (`pg_dump`)
   - 打包 Samba 共享文件 (`tar`)
@@ -70,7 +70,7 @@
   - 复杂度：中
   - 验收标准：备份文件完整，md5sum 校验通过
 
-- [ ] 2.4 传输备份数据到新服务器 192.168.2.3
+- [ ] 2.4 传输备份数据到新服务器 <NEW_SERVER_IP>
   - 通过 scp 传输 SQL 备份、Samba 压缩包、配置文件
   - 依赖：2.3
   - 复杂度：小
@@ -78,27 +78,27 @@
 
 ## 3. 服务器迁移 — 新服务器部署
 
-- [ ] 3.1 部署 Guacamole 容器到 192.168.2.3
-  - 更新 docker-compose.yml：GUACD_HOSTNAME 改为 192.168.2.3，guacamole 端口改为 `127.0.0.1:8081:8080`
+- [ ] 3.1 部署 Guacamole 容器到 <NEW_SERVER_IP>
+  - 更新 docker-compose.yml：GUACD_HOSTNAME 改为 <NEW_SERVER_IP>，guacamole 端口改为 `127.0.0.1:8081:8080`
   - 导入 PostgreSQL 数据
   - 运行标题补丁
   - 依赖：2.4
   - 复杂度：中
   - 验收标准：`curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/guacamole/` 返回 200 或 302
 
-- [ ] 3.2 部署 frpc 到 192.168.2.3
+- [ ] 3.2 部署 frpc 到 <NEW_SERVER_IP>
   - 复制 frpc.toml 配置（serverAddr、auth.token 不变）
   - 创建 systemd 服务并启动
   - 依赖：2.4
   - 复杂度：小
   - 验收标准：`sudo systemctl status frpc` 显示 active，frps dashboard 确认代理在线
 
-- [ ] 3.3 部署 Samba 并恢复共享文件到 192.168.2.3
+- [ ] 3.3 部署 Samba 并恢复共享文件到 <NEW_SERVER_IP>
   - 解压 Samba 备份到 `/data/shares/`
   - 配置 smb.conf
   - 依赖：2.4
   - 复杂度：小
-  - 验收标准：从 Windows Server 可访问 `\\192.168.2.3\public`
+  - 验收标准：从 Windows Server 可访问 `\\<NEW_SERVER_IP>\public`
 
 - [ ] 3.4 更新 deploy/templates/ 模板文件
   - 更新 `docker-compose.yml` 模板（端口绑定、GUACD_HOSTNAME）
@@ -126,7 +126,7 @@
   - 复杂度：中
   - 验收标准：回滚脚本可执行，旧服务器服务可恢复
 
-- [ ] 4.3 退役旧服务器 192.168.2.102
+- [ ] 4.3 退役旧服务器 <OLD_SERVER_IP>
   - 确认新服务器所有服务正常后，停止并禁用旧服务器上的 frpc、Guacamole、Samba
   - 依赖：4.1
   - 复杂度：小
@@ -367,7 +367,7 @@
 
 - [ ] 11.1 编写 PowerShell 截屏脚本 `deploy/scripts/capture-screen.ps1`
   - 获取当前登录用户名 (`$env:USERNAME`)
-  - 构建输出路径：`\\192.168.2.3\screenshots\{username}\{date}\{time}.png`
+  - 构建输出路径：`\\<NEW_SERVER_IP>\screenshots\{username}\{date}\{time}.png`
   - 自动创建目录（如不存在）
   - 使用 .NET System.Drawing 截取主屏幕画面
   - 保存为 PNG 格式
@@ -399,7 +399,7 @@
   - create mask=0660、directory mask=0770
   - 依赖：3.3
   - 复杂度：小
-  - 验收标准：从 Windows Server 可写入 `\\192.168.2.3\screenshots`
+  - 验收标准：从 Windows Server 可写入 `\\<NEW_SERVER_IP>\screenshots`
 
 - [ ] 12.2 更新 `deploy/templates/smb.conf.template` 新增 screenshots 共享段
   - 依赖：12.1
